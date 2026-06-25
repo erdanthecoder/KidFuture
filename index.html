@@ -1,0 +1,182 @@
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('Seeding database...');
+
+  const teacherId = 'seed-teacher-id'
+  const quizData = {
+    maths_year1: [
+      { question: 'What is 2 + 3?', options: ['4', '5', '6', '7'], correct: 1 },
+      { question: 'What is 10 - 4?', options: ['5', '6', '7', '8'], correct: 1 },
+      { question: 'What is 3 × 2?', options: ['5', '6', '7', '8'], correct: 1 },
+      { question: 'What is 8 ÷ 2?', options: ['2', '3', '4', '5'], correct: 2 },
+      { question: 'What comes after 14?', options: ['13', '15', '16', '17'], correct: 1 },
+      { question: 'What is 5 + 5?', options: ['8', '9', '10', '11'], correct: 2 },
+      { question: 'What is 7 - 3?', options: ['3', '4', '5', '6'], correct: 1 },
+      { question: 'How many sides does a square have?', options: ['3', '4', '5', '6'], correct: 1 },
+      { question: 'What is 12 + 3?', options: ['13', '14', '15', '16'], correct: 2 },
+      { question: 'What is 20 - 5?', options: ['13', '14', '15', '16'], correct: 2 },
+    ],
+    maths_year2: [
+      { question: 'What is 15 + 8?', options: ['21', '22', '23', '24'], correct: 2 },
+      { question: 'What is 30 - 12?', options: ['16', '17', '18', '19'], correct: 2 },
+      { question: 'What is 4 × 3?', options: ['10', '11', '12', '13'], correct: 2 },
+      { question: 'What is 20 ÷ 4?', options: ['4', '5', '6', '7'], correct: 1 },
+      { question: 'What is 100 - 45?', options: ['45', '55', '65', '75'], correct: 1 },
+      { question: 'What is 7 × 2?', options: ['12', '13', '14', '15'], correct: 2 },
+      { question: 'What is 36 ÷ 6?', options: ['5', '6', '7', '8'], correct: 1 },
+      { question: 'What is 50 + 37?', options: ['77', '87', '97', '107'], correct: 1 },
+      { question: 'What shape has 3 sides?', options: ['Square', 'Circle', 'Triangle', 'Rectangle'], correct: 2 },
+      { question: 'What is 99 - 33?', options: ['56', '66', '76', '86'], correct: 1 },
+    ],
+    english_year1: [
+      { question: 'What is the first letter of the alphabet?', options: ['A', 'B', 'C', 'D'], correct: 0 },
+      { question: 'Which word starts with "C"?', options: ['Dog', 'Cat', 'Fish', 'Bird'], correct: 1 },
+      { question: 'How many letters are in "CAT"?', options: ['2', '3', '4', '5'], correct: 1 },
+      { question: 'What letter comes after "D"?', options: ['A', 'B', 'C', 'E'], correct: 3 },
+      { question: 'Which is a color?', options: ['Run', 'Blue', 'Jump', 'Eat'], correct: 1 },
+      { question: 'What is the opposite of "big"?', options: ['Tall', 'Small', 'Fast', 'Hot'], correct: 1 },
+      { question: 'Which word is an animal?', options: ['Table', 'Chair', 'Dog', 'Book'], correct: 2 },
+      { question: 'What sound does a cow make?', options: ['Woof', 'Meow', 'Moo', 'Quack'], correct: 2 },
+      { question: 'How many vowels are in "HELLO"?', options: ['1', '2', '3', '4'], correct: 1 },
+      { question: 'Which word is a fruit?', options: ['Car', 'Apple', 'House', 'Shoe'], correct: 1 },
+    ],
+    english_year2: [
+      { question: 'What is the plural of "child"?', options: ['Childs', 'Children', 'Childes', 'Childer'], correct: 1 },
+      { question: 'Which sentence is correct?', options: ['She go to school', 'She goes to school', 'She going school', 'She to school'], correct: 1 },
+      { question: 'What is a noun?', options: ['Action word', 'Naming word', 'Describing word', 'Linking word'], correct: 1 },
+      { question: 'What is the past tense of "run"?', options: ['Runed', 'Ran', 'Runned', 'Running'], correct: 1 },
+      { question: 'Which word is an adjective?', options: ['Quickly', 'Beautiful', 'Run', 'And'], correct: 1 },
+      { question: 'What does "happy" mean?', options: ['Sad', 'Angry', 'Joyful', 'Tired'], correct: 2 },
+      { question: 'Which is a proper noun?', options: ['dog', 'London', 'book', 'table'], correct: 1 },
+      { question: 'What is the opposite of "hot"?', options: ['Warm', 'Cold', 'Cool', 'Mild'], correct: 1 },
+      { question: 'Which word is a verb?', options: ['Jump', 'Blue', 'Happy', 'Chair'], correct: 0 },
+      { question: 'What is the plural of "mouse"?', options: ['Mouses', 'Mice', 'Mousen', 'Mices'], correct: 1 },
+    ],
+    russian_year1: [
+      { question: 'Какая первая буква алфавита?', options: ['А', 'Б', 'В', 'Г'], correct: 0 },
+      { question: 'Сколько букв в слове "МАМА"?', options: ['2', '3', '4', '5'], correct: 2 },
+      { question: 'Какое животное говорит "Мяу"?', options: ['Собака', 'Кошка', 'Корова', 'Петух'], correct: 1 },
+      { question: 'Какой цвет у неба?', options: ['Красный', 'Синий', 'Зелёный', 'Жёлтый'], correct: 1 },
+      { question: 'Что из этого фрукт?', options: ['Стол', 'Яблоко', 'Книга', 'Дом'], correct: 1 },
+      { question: 'Сколько будет 1 + 1?', options: ['1', '2', '3', '4'], correct: 1 },
+      { question: 'Какая буква идёт после "В"?', options: ['А', 'Б', 'Г', 'Д'], correct: 2 },
+      { question: 'Что это: "Это ___"?', options: ['Стол', 'Красивый', 'Бежит', 'Он'], correct: 0 },
+      { question: 'Какого цвета трава?', options: ['Синего', 'Зелёного', 'Красного', 'Жёлтого'], correct: 1 },
+      { question: 'Кто живёт в воде?', options: ['Птица', 'Рыба', 'Собака', 'Кошка'], correct: 1 },
+    ],
+    russian_year2: [
+      { question: 'Что такое существительное?', options: ['Действие', 'Предмет', 'Признак', 'Союз'], correct: 1 },
+      { question: 'Какой падеж отвечает на вопрос "Кого? Чего?"', options: ['Именительный', 'Родительный', 'Дательный', 'Винительный'], correct: 1 },
+      { question: 'Сколько падежей в русском языке?', options: ['4', '5', '6', '7'], correct: 2 },
+      { question: 'Какое слово является глаголом?', options: ['Бег', 'Бежать', 'Беговой', 'Бегом'], correct: 1 },
+      { question: 'Как пишется "молоко" во множественном числе?', options: ['Молоки', 'Молока', 'Молок', 'Нет формы'], correct: 3 },
+      { question: 'Что такое антоним?', options: ['Схожее слово', 'Противоположное слово', 'Одинаковое слово', 'Сложное слово'], correct: 1 },
+      { question: 'Как правильно: "___ книга"?', options: ['Мой', 'Моя', 'Моё', 'Мои'], correct: 1 },
+      { question: 'Какой корень в слове "вода"?', options: ['вод', 'да', 'ода', 'вад'], correct: 0 },
+      { question: 'Что такое синоним?', options: ['Противоположное слово', 'Близкое по значению слово', 'Заимствованное слово', 'Устаревшее слово'], correct: 1 },
+      { question: 'Какой суффикс в слове "котёнок"?', options: ['кот', 'ёнок', 'котён', 'ок'], correct: 1 },
+    ],
+  };
+
+  for (const [key, questions] of Object.entries(quizData)) {
+    const parts = key.split('_');
+    const subject = parts.slice(0, -1).join('_');
+    const year = parseInt(parts[parts.length - 1].replace('year', ''));
+    const capitalized = subject.charAt(0).toUpperCase() + subject.slice(1);
+    const title = `${capitalized} Year ${year}`;
+
+    const existing = await prisma.quiz.findFirst({
+      where: { title, subject: subject.charAt(0).toUpperCase() + subject.slice(1), year },
+    });
+    if (!existing) {
+      await prisma.quiz.create({
+        data: {
+          title,
+          subject: subject.charAt(0).toUpperCase() + subject.slice(1),
+          year,
+          questions: JSON.stringify(questions),
+          createdBy: teacherId,
+        },
+      });
+      console.log(`Created quiz: ${title}`);
+    }
+  }
+
+  const gameTypes = [
+    { title: 'Number Jump', subject: 'Maths', year: 1, type: 'click', config: JSON.stringify({ description: 'Click the correct number!' }) },
+    { title: 'Counting Fun', subject: 'Maths', year: 1, type: 'click', config: JSON.stringify({ description: 'Count the objects!' }) },
+    { title: 'Times Table Dash', subject: 'Maths', year: 2, type: 'click', config: JSON.stringify({ description: 'Race through times tables!' }) },
+    { title: 'Subtraction Blast', subject: 'Maths', year: 2, type: 'click', config: JSON.stringify({ description: 'Blast the correct answers!' }) },
+    { title: 'Letter Match', subject: 'English', year: 1, type: 'match', config: JSON.stringify({ description: 'Match letters to words!' }) },
+    { title: 'Word Builder', subject: 'English', year: 1, type: 'click', config: JSON.stringify({ description: 'Build words from letters!' }) },
+    { title: 'Grammar Quest', subject: 'English', year: 2, type: 'click', config: JSON.stringify({ description: 'Quest for correct grammar!' }) },
+    { title: 'Spelling Bee', subject: 'English', year: 2, type: 'typing', config: JSON.stringify({ description: 'Spell words correctly!' }) },
+    { title: 'Алфавит Adventure', subject: 'Russian', year: 1, type: 'click', config: JSON.stringify({ description: 'Learn the alphabet!' }) },
+    { title: 'Слово Collector', subject: 'Russian', year: 1, type: 'click', config: JSON.stringify({ description: 'Collect words!' }) },
+    { title: 'Падежи Race', subject: 'Russian', year: 2, type: 'click', config: JSON.stringify({ description: 'Race through cases!' }) },
+    { title: 'Грамматика Star', subject: 'Russian', year: 2, type: 'click', config: JSON.stringify({ description: 'Grammar challenge!' }) },
+  ];
+
+  for (const game of gameTypes) {
+    const existing = await prisma.game.findFirst({
+      where: { title: game.title, subject: game.subject, year: game.year },
+    });
+    if (!existing) {
+      await prisma.game.create({ data: game });
+      console.log(`Created game: ${game.title}`);
+    }
+  }
+
+  const worldIslands = [
+    { name: 'Among Us Island', type: 'amongus', maxPlayers: 10 },
+    { name: 'Minecraft World', type: 'minecraft', maxPlayers: 8 },
+    { name: 'Dojo Arena', type: 'dojo', maxPlayers: 6 },
+    { name: 'Adventure Island', type: 'adventure', maxPlayers: 12 },
+    { name: 'Quiz Battle Arena', type: 'quiz', maxPlayers: 4 },
+    { name: 'Creative Studio', type: 'creative', maxPlayers: 8 },
+  ];
+
+  for (const island of worldIslands) {
+    const existing = await prisma.worldIsland.findFirst({
+      where: { name: island.name },
+    });
+    if (!existing) {
+      await prisma.worldIsland.create({ data: island });
+      console.log(`Created island: ${island.name}`);
+    }
+  }
+
+  const sampleLessons = [
+    { title: 'Addition Basics', subject: 'Maths', year: 1, content: 'Addition is when we put two numbers together to find the total.\n\nExample: 2 + 3 = 5\n\nTry it yourself:\n- What is 1 + 1?\n- What is 3 + 2?\n- What is 5 + 4?' },
+    { title: 'Subtraction Fun', subject: 'Maths', year: 1, content: 'Subtraction is when we take away numbers.\n\nExample: 5 - 2 = 3\n\nRemember:\n- Start with the bigger number\n- Take away the smaller number\n- Count what is left!' },
+    { title: 'Times Tables', subject: 'Maths', year: 2, content: 'Multiplication is repeated addition!\n\nExample: 3 × 4 means 3 + 3 + 3 + 3 = 12\n\n2 Times Table:\n2 × 1 = 2\n2 × 2 = 4\n2 × 3 = 6\n2 × 4 = 8\n2 × 5 = 10' },
+    { title: 'Division Introduction', subject: 'Maths', year: 2, content: 'Division is sharing equally.\n\nExample: 12 ÷ 3 = 4\n\nIf you have 12 cookies and share among 3 friends, each gets 4 cookies! 🍪' },
+    { title: 'Alphabet & Sounds', subject: 'English', year: 1, content: 'The English alphabet has 26 letters.\n\nVowels: A, E, I, O, U\nConsonants: B, C, D, F, G, H, J, K, L, M, N, P, Q, R, S, T, V, W, X, Y, Z\n\nPractice: Say each letter and its sound!' },
+    { title: 'Building Words', subject: 'English', year: 1, content: 'Words are made from letters!\n\nC + A + T = CAT 🐱\nD + O + G = DOG 🐕\n\nTry making these words:\n- SUN ☀️\n- RUN 🏃\n- BIG 📏' },
+    { title: 'Nouns and Verbs', subject: 'English', year: 2, content: 'Nouns are naming words (person, place, thing).\nExamples: teacher, school, book\n\nVerbs are action words.\nExamples: run, jump, read\n\nCan you find the noun and verb in: "The cat sleeps."' },
+    { title: 'Sentence Building', subject: 'English', year: 2, content: 'A sentence starts with a capital letter and ends with a full stop.\n\nExample: The dog is playing in the park.\n\nEvery sentence needs:\n1. A capital letter\n2. A subject (who/what)\n3. A verb (action)\n4. A full stop at the end' },
+    { title: 'Алфавит', subject: 'Russian', year: 1, content: 'Русский алфавит состоит из 33 букв.\n\nГласные: А, Е, Ё, И, О, У, Ы, Э, Ю, Я\nСогласные: Б, В, Г, Д, Ж, З, К, Л, М, Н, П, Р, С, Т, Ф, Х, Ц, Ч, Ш, Щ\n\nПовторите алфавит каждый день!' },
+    { title: 'Первые слова', subject: 'Russian', year: 1, content: 'Учимся читать первые слова!\n\nМА-МА 👩\nПА-ПА 👨\nДОМ 🏠\nКОТ 🐱\n\nЧитайте по слогам!' },
+    { title: 'Части речи', subject: 'Russian', year: 2, content: 'В русском языке есть разные части речи:\n\nИмя существительное - предмет (стол, книга, дом)\nГлагол - действие (бежать, писать, читать)\nИмя прилагательное - признак (красивый, большой, умный)\n\nНайдите существительное: "Красивая книга лежит на столе"' },
+    { title: 'Падежи', subject: 'Russian', year: 2, content: 'В русском языке 6 падежей:\n\n1. Именительный - кто? что?\n2. Родительный - кого? чего?\n3. Дательный - кому? чему?\n4. Винительный - кого? что?\n5. Творительный - кем? чем?\n6. Предложный - о ком? о чём?' },
+  ];
+
+  for (const lesson of sampleLessons) {
+    const existing = await prisma.lesson.findFirst({
+      where: { title: lesson.title, subject: lesson.subject, year: lesson.year },
+    });
+    if (!existing) {
+      await prisma.lesson.create({
+        data: { ...lesson, createdBy: teacherId },
+      });
+      console.log(`Created lesson: ${lesson.title}`);
+    }
+  }
+
+  console.log('Seed completed successfully!');
+}
+
