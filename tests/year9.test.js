@@ -155,3 +155,14 @@ test('science and English generators are consistent', () => {
   }
   assert.equal(CHAPTERS.length, 12);
 });
+
+test('every topic has flashcards, and every card has a front and back', async () => {
+  const { CARDS } = await import('../year9/js/content-cards.js');
+  const ids = [MATHS, SCIENCE, ENGLISH].flatMap((s) => s.units.flatMap((u) => u.lessons.map((l) => l.id)));
+  for (const id of ids) assert.ok(CARDS[id]?.length >= 3, `flashcards for ${id}`);
+  for (const [id, list] of Object.entries(CARDS)) {
+    assert.ok(ids.includes(id), `unknown lesson ${id}`);
+    for (const [f, b] of list) assert.ok(f.trim() && b.trim(), `${id}: empty card`);
+    assert.equal(new Set(list.map((c) => c[0])).size, list.length, `${id}: duplicate card fronts`);
+  }
+});

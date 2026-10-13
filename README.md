@@ -22,6 +22,7 @@ multiple choice, true/false, typed answers (exact maths checking: `1/8`, `0.125`
 endless practice, and every generated answer is re-calculated by the tests.
 
 - **Today's session** (≈20 min): warm-up review → learn a new topic → practise → mixed questions.
+- **Flashcards**: 255 cards covering every topic, with a 3D flip and FSRS spaced repetition (20 new a day; cards you forget come back the same day).
 - **Spaced review**: topics come back after 1, 2, 4, 7 and 14 days; mistakes reset them.
 - **Unit tests**, an **all-topics revision sheet** (printable), XP, streaks and a 20-minute daily goal.
 - **Sign in with Google** (school Google Workspace accounts work), via Firebase Authentication like

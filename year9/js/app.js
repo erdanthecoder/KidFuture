@@ -5,6 +5,8 @@ import { SIMS } from './sims.js';
 import { checkTyped, shuffle, pick, prettyNum, escapeHtml } from './engine.js';
 import { confetti, floatText, countUp, sound, setSound } from './fx.js';
 import { currentUser, signInWithGoogle, googleAvailable, signOutUser, continueAsGuest } from './auth.js';
+import { CARDS } from './content-cards.js';
+import { schedule, preview, formatInterval, AGAIN, HARD, GOOD, EASY, MIN } from './scheduler.js';
 
 // ------------------------------------------------------------------ content index
 export const SUBJECTS = [MATHS, SCIENCE, ENGLISH];
@@ -17,10 +19,11 @@ const INTERVALS = [0, 1, 2, 4, 7, 14]; // days until the next review, by box
 const DAILY_GOAL = 20; // minutes
 let user = currentUser();
 let P = load();
+P.cards ||= {}; P.newCards ||= {};
 
-function blank() { return { xp: 0, days: {}, lessons: {}, sessions: 0, sound: true, lastSubject: null, tests: {} }; }
+function blank() { return { xp: 0, days: {}, lessons: {}, sessions: 0, sound: true, lastSubject: null, tests: {}, cards: {}, newCards: {} }; }
 function storeKey() { return `y9.v1.${user?.uid || 'guest'}`; }
-function load() { try { return { ...blank(), ...JSON.parse(localStorage.getItem(storeKey()) || '{}') }; } catch { return blank(); } }
+function load() { try { const d = { ...blank(), ...JSON.parse(localStorage.getItem(storeKey()) || '{}') }; d.cards ||= {}; d.newCards ||= {}; return d; } catch { return blank(); } }
 function save() { try { localStorage.setItem(storeKey(), JSON.stringify(P)); } catch { /* storage unavailable */ } }
 setSound(P.sound);
 
@@ -148,7 +151,7 @@ function render() {
   scrollTo(0, 0);
   if (!user) return loginView();
   const { name, args } = route();
-  const views = { '': homeView, subject: subjectView, lesson: lessonView, practice: practiceView, session: sessionView, test: testView, topics: topicsView, profile: profileView };
+  const views = { cards: cardsView, '': homeView, subject: subjectView, lesson: lessonView, practice: practiceView, session: sessionView, test: testView, topics: topicsView, profile: profileView };
   (views[name] || homeView)(...args);
   $$('nav a', document).forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#/${name}` || (a.getAttribute('href') === '#/' && name === '')));
   const av = document.getElementById('avatar');
@@ -218,6 +221,7 @@ function homeView() {
     <section class="stat-row slide-up" style="--d:1">
       <div class="stat goal">${ring(mins, DAILY_GOAL)}<div><b><span id="mins">0</span> / ${DAILY_GOAL} min</b><small>today’s goal</small></div></div>
       <div class="stat"><span class="flame ${s ? 'lit' : ''}">🔥</span><div><b><span id="streak">0</span> day${s === 1 ? '' : 's'}</b><small>streak</small></div></div>
+      <a class="stat" href="#/cards"><span class="fc-icon">🃏</span><div><b><span id="cdue">0</span> cards</b><small>flashcards due</small></div></a>
       <div class="stat"><span class="lvl">${lv}</span><div><b><span id="xp">0</span> XP</b><small>level ${lv} · ${250 - (P.xp % 250)} to next</small><div class="xpbar"><i style="--w:${(P.xp % 250) / 2.5}%"></i></div></div></div>
     </section>
     <section class="today-card slide-up" style="--d:2">
@@ -226,7 +230,8 @@ function homeView() {
         <div class="orbit-icon" aria-hidden="true">${plan.lesson ? LESSONS.get(plan.lesson.id).subject.icon : '🏆'}</div></div>
       <ol class="plan">
         ${plan.warmIds.length ? `<li><b>Warm-up</b> — ${plan.warmIds.length} quick questions from earlier topics <small>~3 min</small></li>` : ''}
-        ${plan.lesson ? `<li><b>Learn</b> — animated explanation and worked examples <small>~6 min</small></li><li><b>Practise</b> — 8 activities with instant feedback <small>~7 min</small></li>` : ''}
+        ${dueReviewCards().length ? `<li><b>Flashcards</b> — ${Math.min(10, dueReviewCards().length)} cards due for review <small>~2 min</small></li>` : ''}
+        ${plan.lesson ? `<li><b>Learn</b> — animated explanation and worked examples <small>~6 min</small></li><li><b>Practise</b> — 8 activities with instant feedback <small>~7 min</small></li><li><b>Flashcards</b> — the new topic’s key facts <small>~2 min</small></li>` : ''}
         <li><b>Mix it up</b> — questions from different subjects <small>~4 min</small></li>
       </ol>
       <a class="btn primary big" href="#/session">▶ Start session</a>
@@ -244,6 +249,7 @@ function homeView() {
   countUp($('#mins'), mins);
   countUp($('#streak'), s);
   countUp($('#xp'), P.xp);
+  countUp($('#cdue'), cardQueue().length);
   requestAnimationFrame(() => $$('.ring-fg').forEach((c) => c.setAttribute('stroke-dashoffset', c.style.getPropertyValue('--off'))));
 }
 
@@ -262,7 +268,7 @@ function subjectView(id) {
           <li class="${P.lessons[l.id]?.learned ? 'learned' : ''}">
             <div class="l-main"><b>${escapeHtml(l.title)}</b>${starHtml(l.id)}${isDue(l.id) ? '<span class="chip due">review due</span>' : ''}</div>
             <div class="l-actions"><a class="btn small ${P.lessons[l.id]?.learned ? 'ghost' : 'primary'}" href="#/lesson/${l.id}">${P.lessons[l.id]?.learned ? 'Re-learn' : 'Learn'}</a>
-            <a class="btn small" href="#/practice/${l.id}">Practise</a></div>
+            <a class="btn small" href="#/practice/${l.id}">Practise</a>${CARDS[l.id] ? `<a class="btn small" href="#/cards/${l.id}">🃏 Cards</a>` : ''}</div>
           </li>`).join('')}</ul>
       </section>`).join('')}`;
 }
@@ -575,16 +581,169 @@ function testView(subjectId, unitN) {
   });
 }
 
+// ------------------------------------------------------------------ flashcards (FSRS spaced repetition)
+const ALL_CARDS = [];
+for (const [lessonId, list] of Object.entries(CARDS)) list.forEach(([front, back], i) => ALL_CARDS.push({ id: `${lessonId}:${i}`, lessonId, front, back }));
+const NEW_PER_DAY = 20;
+const endOfToday = () => { const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime(); };
+const lessonOrder = [...LESSONS.keys()];
+
+function dueReviewCards() {
+  const now = Date.now(), end = endOfToday();
+  return shuffle(ALL_CARDS.filter((c) => { const s = P.cards[c.id]; return s && (s.state === 'review' ? s.due <= end : s.due <= now + 20 * MIN); }));
+}
+function newCardsToday() {
+  const left = Math.max(0, NEW_PER_DAY - (P.newCards[dayKey()] || 0));
+  const learned = new Set(learnedIds());
+  return ALL_CARDS.filter((c) => !P.cards[c.id])
+    .sort((a, b) => (learned.has(b.lessonId) - learned.has(a.lessonId)) || (lessonOrder.indexOf(a.lessonId) - lessonOrder.indexOf(b.lessonId)))
+    .slice(0, left);
+}
+const cardQueue = () => [...dueReviewCards(), ...newCardsToday()];
+
+function rateCard(card, g) {
+  const before = P.cards[card.id];
+  if (!before) P.newCards[dayKey()] = (P.newCards[dayKey()] || 0) + 1;
+  const base = before || { state: 'new', due: 0, stability: 0, difficulty: 0, reps: 0, lapses: 0, step: 0, lastReview: null };
+  P.cards[card.id] = schedule(base, g, Date.now(), { id: card.id, retention: 0.9 });
+  const gain = g === AGAIN ? 1 : 3;
+  P.xp += gain;
+  save();
+  return gain;
+}
+
+function runCards(root, list, { title = 'Flashcards', onDone }) {
+  studying = true;
+  const queue = [...list];
+  const later = []; // cards to see again in this sitting
+  let current = null, flipped = false, reviewed = 0, knew = 0, xp = 0;
+  const start = Date.now();
+
+  const pickNext = () => {
+    const now = Date.now();
+    later.sort((a, b) => P.cards[a.id].due - P.cards[b.id].due);
+    if (later.length && P.cards[later[0].id].due <= now) return later.shift();
+    if (queue.length) return queue.shift();
+    return later.shift() || null;
+  };
+
+  const show = () => {
+    current = pickNext();
+    flipped = false;
+    if (!current) { keyHandler = null; finish(); return; }
+    const ref = LESSONS.get(current.lessonId);
+    const left = queue.length + later.length + 1;
+    const pv = preview(P.cards[current.id] || { state: 'new', due: 0, stability: 0, difficulty: 0, reps: 0, lapses: 0, step: 0, lastReview: null }, Date.now(), { id: current.id, retention: 0.9 });
+    root.innerHTML = `
+      <div class="fc-wrap">
+        <div class="qtop"><button class="btn ghost small" id="quit" aria-label="Stop">✕</button>
+          <div class="pbar"><i style="--w:${(100 * reviewed) / (reviewed + left)}%"></i></div><span class="fc-left">${left} left</span></div>
+        <p class="qlabel">${escapeHtml(title)}${!P.cards[current.id] ? ' · <b>new</b>' : ''}</p>
+        <button class="fc ${ref.subject.id}" id="fc" aria-label="Flip card">
+          <span class="fc-in">
+            <span class="fc-face fc-front"><span class="fc-tag">${ref.subject.icon} ${escapeHtml(ref.lesson.title)}</span><span class="fc-text">${current.front}</span><span class="fc-hint">Think of the answer… then tap to flip</span></span>
+            <span class="fc-face fc-back"><span class="fc-tag">${escapeHtml(current.front.replace(/<[^>]+>/g, ''))}</span><span class="fc-text">${current.back}</span></span>
+          </span>
+        </button>
+        <div class="fc-rate" id="rate" hidden>
+          ${[[AGAIN, 'Again', 'Forgot'], [HARD, 'Hard', 'Struggled'], [GOOD, 'Good', 'Got it'], [EASY, 'Easy', 'Instantly']].map(([g, n, d]) => `
+            <button class="rate g${g}" data-g="${g}"><span class="ivl">${formatInterval(pv[g])}</span><b>${n}</b><small>${d}</small></button>`).join('')}
+        </div>
+        <button class="btn primary wide" id="flip">Show answer <kbd>Space</kbd></button>
+      </div>`;
+    $('#quit', root).addEventListener('click', () => { toast('Stopped — your progress is saved.'); location.hash = '#/cards'; });
+    const flip = () => {
+      if (flipped) return;
+      flipped = true; sound('tap');
+      $('#fc', root).classList.add('flipped');
+      $('#rate', root).hidden = false;
+      $('#flip', root).hidden = true;
+    };
+    $('#fc', root).addEventListener('click', flip);
+    $('#flip', root).addEventListener('click', flip);
+    $$('[data-g]', root).forEach((b) => b.addEventListener('click', () => rate(Number(b.dataset.g))));
+    keyHandler = (e) => {
+      if (!flipped && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); flip(); }
+      else if (flipped && ['1', '2', '3', '4'].includes(e.key)) rate(Number(e.key));
+    };
+  };
+
+  const rate = (g) => {
+    if (!flipped || !current) return;
+    const gain = rateCard(current, g);
+    xp += gain; reviewed++;
+    if (g !== AGAIN) knew++;
+    sound(g === AGAIN ? 'wrong' : 'correct');
+    floatText(`+${gain} XP`, $('#fc', root), 'xp');
+    const st = P.cards[current.id];
+    if (st.due <= Date.now() + 20 * MIN) later.push(current); // still learning: comes back in a few minutes
+    const fc = $('#fc', root);
+    fc.classList.add(g === AGAIN ? 'out-left' : 'out-right');
+    keyHandler = null;
+    setTimeout(show, 330);
+  };
+
+  const finish = () => {
+    studying = false;
+    const pct = reviewed ? Math.round((100 * knew) / reviewed) : 0;
+    const tomorrow = ALL_CARDS.filter((c) => { const s = P.cards[c.id]; return s && s.due > endOfToday() && s.due <= endOfToday() + DAY; }).length;
+    if (onDone) { onDone({ reviewed, knew, xp, secs: (Date.now() - start) / 1000 }); return; }
+    root.innerHTML = `<section class="results pop-in"><h1>Cards done! 🃏</h1>
+      <div class="res-stats"><div><b>${reviewed}</b><small>cards</small></div><div><b>${pct}%</b><small>knew it</small></div><div><b>+${xp}</b><small>XP</small></div></div>
+      <p class="muted">${tomorrow ? `${tomorrow} card${tomorrow > 1 ? 's' : ''} will come back tomorrow.` : 'Cards you know come back later, just before you would forget them.'}</p>
+      <div class="row center"><a class="btn" href="#/cards">Flashcards</a><a class="btn primary" href="#/">Home</a></div></section>`;
+    if (reviewed) { confetti(90); sound('finish'); }
+  };
+
+  show();
+}
+
+function cardsView(lessonId) {
+  document.body.classList.remove('focus-mode');
+  if (lessonId) {
+    const ref = LESSONS.get(lessonId);
+    if (!ref || !CARDS[lessonId]) { location.hash = '#/cards'; return; }
+    document.body.classList.add('focus-mode');
+    app.innerHTML = '<div id="stage"></div>';
+    runCards($('#stage'), shuffle(ALL_CARDS.filter((c) => c.lessonId === lessonId)), { title: ref.lesson.title });
+    return;
+  }
+  const due = dueReviewCards(), fresh = newCardsToday(), q = [...due, ...fresh];
+  const seen = ALL_CARDS.filter((c) => P.cards[c.id]).length;
+  const strong = ALL_CARDS.filter((c) => P.cards[c.id]?.state === 'review' && P.cards[c.id].stability >= 7).length;
+  app.innerHTML = `
+    <section class="cards-hero slide-up">
+      <div class="deck" aria-hidden="true"><span></span><span></span><span>🃏</span></div>
+      <div><h1>Flashcards</h1><p class="muted">${ALL_CARDS.length} cards from all your topics. Cards you know come back less often; cards you forget come back soon.</p></div>
+    </section>
+    <section class="stat-row cards-stats slide-up" style="--d:1">
+      <div class="stat"><div><b>${due.length}</b><small>due for review</small></div></div>
+      <div class="stat"><div><b>${fresh.length}</b><small>new today</small></div></div>
+      <div class="stat"><div><b>${seen}/${ALL_CARDS.length}</b><small>seen</small></div></div>
+      <div class="stat"><div><b>${strong}</b><small>known well</small></div></div>
+    </section>
+    ${q.length ? `<button class="btn primary big wide slide-up" style="--d:2" id="go">▶ Study ${q.length} card${q.length > 1 ? 's' : ''}</button>` : '<p class="done-msg slide-up">All caught up for today! Come back tomorrow, or study a topic below.</p>'}
+    ${SUBJECTS.map((s) => `<section class="unit slide-up" style="--d:3"><h2>${s.icon} ${s.name}</h2><ul class="lesson-list">${s.units.flatMap((u) => u.lessons).filter((l) => CARDS[l.id]).map((l) => {
+      const cs = ALL_CARDS.filter((c) => c.lessonId === l.id);
+      const known = cs.filter((c) => P.cards[c.id]?.state === 'review').length;
+      return `<li><div class="l-main"><b>${escapeHtml(l.title)}</b><span class="chip">${known}/${cs.length} known</span></div><div class="l-actions"><a class="btn small" href="#/cards/${l.id}">Study</a></div></li>`;
+    }).join('')}</ul></section>`).join('')}`;
+  $('#go')?.addEventListener('click', () => { document.body.classList.add('focus-mode'); runCards(app, cardQueue(), { title: 'Flashcards' }); });
+}
+
 // ------------------------------------------------------------------ today's session
 function sessionView() {
   document.body.classList.add('focus-mode');
   const plan = sessionPlan();
   const phases = [];
   if (plan.warmIds.length) phases.push({ kind: 'quiz', label: 'Warm-up', questions: () => plan.warmIds.map((id) => make(pick(LESSONS.get(id).lesson.practice), id)) });
+  const dueCards = dueReviewCards().slice(0, 10);
+  if (dueCards.length) phases.push({ kind: 'cards', label: 'Flashcards', cards: () => dueCards });
   if (plan.lesson) {
     const ref = LESSONS.get(plan.lesson.id);
     phases.push({ kind: 'learn', label: 'Learn', ref });
     phases.push({ kind: 'quiz', label: 'Practise', questions: () => practiceSet(plan.lesson, 8) });
+    if (CARDS[plan.lesson.id]) phases.push({ kind: 'cards', label: 'New cards', cards: () => ALL_CARDS.filter((c) => c.lessonId === plan.lesson.id && !P.cards[c.id]).slice(0, 8) });
   }
   phases.push({ kind: 'quiz', label: 'Mix it up', questions: () => {
     const pool = learnedIds().filter((id) => id !== plan.lesson?.id);
@@ -619,6 +778,14 @@ function sessionView() {
         P.lastSubject = p.ref.subject.id; save();
         runPhase(n + 1);
       });
+      return;
+    }
+    if (p.kind === 'cards') {
+      const list = p.cards();
+      if (!list.length) { runPhase(n + 1); return; }
+      stage.innerHTML = `<div class="phase-intro pop-in"><span class="pill">${p.label}</span><h2>${p.label === 'Flashcards' ? 'Flashcards due today' : 'Lock in the key facts'}</h2>
+        <p class="muted">Say the answer in your head, flip, then be honest about how well you knew it.</p></div>`;
+      setTimeout(() => runCards(stage, list, { title: p.label, onDone: (r) => { xpTotal += r.xp; runPhase(n + 1); } }), 1300);
       return;
     }
     const questions = p.questions();
