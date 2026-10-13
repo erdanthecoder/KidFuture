@@ -269,7 +269,7 @@ function subjectView(id) {
 
 function topicsView() {
   app.innerHTML = `
-    <div class="section-head"><a href="#/" class="back">← Home</a><button class="btn small" onclick="print()">🖨 Print</button></div>
+    <div class="section-head"><a href="#/" class="back">← Home</a>${window.Y9_PREVIEW ? '' : '<button class="btn small" id="print">🖨 Print</button>'}</div>
     <h1>All topics — revision sheet</h1>
     <p class="muted">Every topic in the app, with the key facts. Tap a topic title to learn it.</p>
     ${SUBJECTS.map((s) => `
@@ -279,6 +279,7 @@ function topicsView() {
           ${u.lessons.map((l) => `<details class="sheet-lesson" open><summary><a href="#/lesson/${l.id}">${escapeHtml(l.title)}</a> ${starHtml(l.id)}</summary><ul>${l.keys.map((k) => `<li>${k}</li>`).join('')}</ul></details>`).join('')}
         </div>`).join('')}
       </section>`).join('')}`;
+  $('#print')?.addEventListener('click', () => print());
 }
 
 // ------------------------------------------------------------------ learn slides
@@ -392,7 +393,7 @@ function runQuiz(root, { questions, mode = 'practice', title = '', onDone }) {
         <article class="qcard pop-in"><div class="qtext">${q.q}</div><div id="ans"></div></article>
         <div class="qbottom"><button class="btn primary wide" id="check" disabled>Check</button></div>
       </div>`;
-    $('#quit', root).addEventListener('click', () => { if (confirm('Stop now? Your progress so far is saved.')) location.hash = '#/'; });
+    $('#quit', root).addEventListener('click', () => { toast('Stopped — your progress is saved.'); location.hash = '#/'; });
     if (test) {
       const tick = () => { const s = Math.round((Date.now() - start) / 1000); const el = $('#qt', root); if (el) el.textContent = `⏱ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
       tick(); const t = setInterval(tick, 1000); cleanup.push(() => clearInterval(t));
@@ -650,7 +651,10 @@ function profileView() {
     </section>`;
   $('#snd').addEventListener('change', (e) => { P.sound = e.target.checked; setSound(P.sound); save(); });
   $('#out').addEventListener('click', () => { signOutUser(); user = null; location.hash = '#/'; render(); });
-  $('#reset').addEventListener('click', () => { if (confirm('Reset all your XP, streak and topic progress?')) { P = blank(); save(); toast('Progress reset.'); render(); } });
+  $('#reset').addEventListener('click', (e) => {
+    if (!e.target.dataset.armed) { e.target.dataset.armed = '1'; e.target.textContent = 'Tap again to reset everything'; return; }
+    P = blank(); save(); toast('Progress reset.'); render();
+  });
 }
 
 render();
