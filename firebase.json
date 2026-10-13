@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "target": "year9",
+    "public": "year9",
+    "cleanUrls": true,
+    "headers": [
+      { "source": "**/*.@(js|css|html|webmanifest)", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+    ]
+  }
+}

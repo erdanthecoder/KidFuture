@@ -1,0 +1,11 @@
+{
+  "name": "Year 9 Revision",
+  "short_name": "Y9 Revision",
+  "description": "Maths, Science and English revision in 15–30 minutes a day.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f4ff",
+  "theme_color": "#6d4aff",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

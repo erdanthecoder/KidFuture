@@ -1,0 +1,60 @@
+name: Deploy year9topics.web.app
+
+# Deploys the Year 9 revision app (folder year9/) to Firebase Hosting.
+# Needs one repository secret, FIREBASE_SERVICE_ACCOUNT: the same service-account JSON key
+# used by the copilot repo (Firebase console → Project settings → Service accounts →
+# Generate new private key). The project ID is read from the key, and the
+# "year9topics" site is created automatically if it doesn't exist yet.
+on:
+  push:
+    branches: ["main", "claude/awesome-pasteur-x0z7t5"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      HAS_FIREBASE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Skip (no Firebase secret yet)
+        if: env.HAS_FIREBASE != 'true'
+        run: echo "FIREBASE_SERVICE_ACCOUNT secret is not set — skipping deploy."
+      - uses: actions/setup-node@v4
+        if: env.HAS_FIREBASE == 'true'
+        with:
+          node-version: 22
+      - name: Create the site (if needed) and deploy
+        if: env.HAS_FIREBASE == 'true'
+        env:
+          SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SA_KEY" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          PROJECT=$(jq -r .project_id "$RUNNER_TEMP/sa.json")
+          echo "Firebase project: $PROJECT"
+          npm i -g firebase-tools@14 >/dev/null
+          firebase hosting:sites:get year9topics --project "$PROJECT" >/dev/null 2>&1 \
+            && echo "Site year9topics exists" \
+            || firebase hosting:sites:create year9topics --project "$PROJECT" --non-interactive
+          # A registered web app makes /__/firebase/init.json available for Google sign-in.
+          if [ "$(firebase apps:list WEB --project "$PROJECT" --json | jq '.result | length')" = "0" ]; then
+            firebase apps:create WEB "Year 9 Revision" --project "$PROJECT"
+          fi
+          npm i --no-save google-auth-library@9 >/dev/null
+          node scripts/firebase-auth-domains.mjs "$PROJECT"
+          firebase use --add "$PROJECT" --alias default >/dev/null 2>&1 || true
+          firebase target:clear hosting year9 --project "$PROJECT" >/dev/null 2>&1 || true
+          firebase target:apply hosting year9 year9topics --project "$PROJECT"
+          firebase deploy --only hosting:year9 --project "$PROJECT" --non-interactive
+          rm -f "$RUNNER_TEMP/sa.json"

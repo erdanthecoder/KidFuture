@@ -1,0 +1,8 @@
+{
+  "projects": { "default": "learnkyrgyz-c999c" },
+  "targets": {
+    "learnkyrgyz-c999c": {
+      "hosting": { "year9": ["year9topics"] }
+    }
+  }
+}
