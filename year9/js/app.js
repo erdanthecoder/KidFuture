@@ -80,6 +80,13 @@ const app = document.getElementById('app');
 const $ = (s, r = app) => r.querySelector(s);
 const $$ = (s, r = app) => [...r.querySelectorAll(s)];
 let cleanup = [];
+let renderId = 0;
+// A delayed step that is cancelled if the user moves to another page first.
+function later(fn, ms) {
+  const id = renderId;
+  const t = setTimeout(() => { if (id === renderId) fn(); }, ms);
+  cleanup.push(() => clearTimeout(t));
+}
 let keyHandler = null;
 addEventListener('keydown', (e) => keyHandler?.(e));
 
@@ -147,6 +154,7 @@ function route() {
 function render() {
   cleanup.forEach((f) => { try { f(); } catch { /* ignore */ } });
   cleanup = [];
+  renderId++;
   keyHandler = null;
   studying = false;
   document.body.classList.remove('focus-mode');
@@ -435,7 +443,7 @@ function runQuiz(root, { questions, mode = 'practice', title = '', onDone }) {
       ans.innerHTML = `<input class="answer-input" id="inp" ${q.type === 'num' ? 'inputmode="decimal"' : ''} autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${q.type === 'num' ? 'Type your answer' : 'Type your answer'}">
         ${q.type === 'num' ? '<p class="hint small">Numbers like 0.125, 1/8, −3 or 5.4 × 10^7 are all fine.</p>' : ''}`;
       const inp = $('#inp', ans);
-      setTimeout(() => inp.focus({ preventScroll: true }), 250);
+      later(() => inp.focus({ preventScroll: true }), 250);
       inp.addEventListener('input', () => ready(inp.value.trim() ? () => {
         const r = checkTyped(q, inp.value);
         if (r === 'invalid') { inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake'); toast(q.type === 'num' ? 'Type a number, e.g. 2.5 or 1/4' : 'Type an answer'); return null; }
@@ -460,7 +468,7 @@ function runQuiz(root, { questions, mode = 'practice', title = '', onDone }) {
         if (q.pairs[selL][1] === q.right[Number(b.dataset.r)]) {
           L.classList.remove('sel'); L.classList.add('done'); b.classList.add('done');
           matched++; selL = null; sound('tap');
-          if (matched === q.pairs.length) setTimeout(() => finish(q, mistakes === 0, mistakes ? `You matched them all, with ${mistakes} mistake${mistakes > 1 ? 's' : ''} on the way.` : ''), 350);
+          if (matched === q.pairs.length) later(() => finish(q, mistakes === 0, mistakes ? `You matched them all, with ${mistakes} mistake${mistakes > 1 ? 's' : ''} on the way.` : ''), 350);
         } else {
           mistakes++;
           b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope');
@@ -488,7 +496,7 @@ function runQuiz(root, { questions, mode = 'practice', title = '', onDone }) {
       const r = getResult();
       if (!r) return;
       check.disabled = true;
-      setTimeout(() => finish(q, r[0], r[1] || ''), test ? 150 : 250);
+      later(() => finish(q, r[0], r[1] || ''), test ? 150 : 250);
     });
   }
 
@@ -514,7 +522,7 @@ function resultsView(root, { results, xp, secs, title, onAgain, againLabel = 'Pr
   countUp($('#pct', root), pct);
   countUp($('#rx', root), xp + bonus);
   requestAnimationFrame(() => $$('.ring-fg', root).forEach((c) => c.setAttribute('stroke-dashoffset', c.style.getPropertyValue('--off'))));
-  if (pct >= 70) setTimeout(() => { confetti(pct >= 90 ? 200 : 110); sound('finish'); }, 400);
+  if (pct >= 70) later(() => { confetti(pct >= 90 ? 200 : 110); sound('finish'); }, 400);
   $('#again', root)?.addEventListener('click', onAgain);
 }
 
@@ -614,16 +622,16 @@ function rateCard(card, g) {
 function runCards(root, list, { title = 'Flashcards', onDone }) {
   studying = true;
   const queue = [...list];
-  const later = []; // cards to see again in this sitting
+  const again = []; // cards to see again in this sitting
   let current = null, flipped = false, reviewed = 0, knew = 0, xp = 0;
   const start = Date.now();
 
   const pickNext = () => {
     const now = Date.now();
-    later.sort((a, b) => P.cards[a.id].due - P.cards[b.id].due);
-    if (later.length && P.cards[later[0].id].due <= now) return later.shift();
+    again.sort((a, b) => P.cards[a.id].due - P.cards[b.id].due);
+    if (again.length && P.cards[again[0].id].due <= now) return again.shift();
     if (queue.length) return queue.shift();
-    return later.shift() || null;
+    return again.shift() || null;
   };
 
   const show = () => {
@@ -631,7 +639,7 @@ function runCards(root, list, { title = 'Flashcards', onDone }) {
     flipped = false;
     if (!current) { keyHandler = null; finish(); return; }
     const ref = LESSONS.get(current.lessonId);
-    const left = queue.length + later.length + 1;
+    const left = queue.length + again.length + 1;
     const pv = preview(P.cards[current.id] || { state: 'new', due: 0, stability: 0, difficulty: 0, reps: 0, lapses: 0, step: 0, lastReview: null }, Date.now(), { id: current.id, retention: 0.9 });
     root.innerHTML = `
       <div class="fc-wrap">
@@ -675,11 +683,11 @@ function runCards(root, list, { title = 'Flashcards', onDone }) {
     sound(g === AGAIN ? 'wrong' : 'correct');
     floatText(`+${gain} XP`, $('#fc', root), 'xp');
     const st = P.cards[current.id];
-    if (st.due <= Date.now() + 20 * MIN) later.push(current); // still learning: comes back in a few minutes
+    if (st.due <= Date.now() + 20 * MIN) again.push(current); // still learning: comes back in a few minutes
     const fc = $('#fc', root);
     fc.classList.add(g === AGAIN ? 'out-left' : 'out-right');
     keyHandler = null;
-    setTimeout(show, 330);
+    later(show, 330);
   };
 
   const finish = () => {
@@ -784,14 +792,14 @@ function sessionView() {
       if (!list.length) { runPhase(n + 1); return; }
       stage.innerHTML = `<div class="phase-intro pop-in"><span class="pill">${p.label}</span><h2>${p.label === 'Flashcards' ? 'Flashcards due today' : 'Lock in the key facts'}</h2>
         <p class="muted">Say the answer in your head, flip, then be honest about how well you knew it.</p></div>`;
-      setTimeout(() => runCards(stage, list, { title: p.label, onDone: (r) => { xpTotal += r.xp; runPhase(n + 1); } }), 1300);
+      later(() => runCards(stage, list, { title: p.label, onDone: (r) => { xpTotal += r.xp; runPhase(n + 1); } }), 1300);
       return;
     }
     const questions = p.questions();
     if (!questions.length) { runPhase(n + 1); return; }
     stage.innerHTML = `<div class="phase-intro pop-in"><span class="pill">${p.label}</span><h2>${{ 'Warm-up': 'Can you still remember these?', Practise: 'Your turn!', 'Mix it up': 'Mixed questions — different topics' }[p.label]}</h2>
       <p class="muted">${{ 'Warm-up': 'Trying to remember older topics is what makes them stick.', Practise: 'Mistakes come back at the end so you can get them right.', 'Mix it up': 'Switching between topics trains your brain to choose the right method.' }[p.label]}</p></div>`;
-    setTimeout(() => runQuiz(stage, { questions, title: p.label, onDone: (r) => { all.push(...r.results); xpTotal += r.xp; recordResults(r.results); runPhase(n + 1); } }), 1300);
+    later(() => runQuiz(stage, { questions, title: p.label, onDone: (r) => { all.push(...r.results); xpTotal += r.xp; recordResults(r.results); runPhase(n + 1); } }), 1300);
   };
   const extraRound = () => {
     const ids = learnedIds();

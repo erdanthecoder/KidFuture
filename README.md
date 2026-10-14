@@ -40,6 +40,9 @@ for Google sign-in. Google sign-in must be enabled in Firebase → Authenticatio
 
 Run locally: `npm start`, then open http://localhost:8080/year9/
 
+**One-file version:** `./scripts/build-single-file.sh` builds `dist/Year9-Revision.html` — the whole app in a
+single file that works offline when opened in a browser, with no website needed.
+
 ## 2. Practice app — repo root
 
 A flashcard app for any subject, with FSRS spaced repetition. Works offline on your phone.
