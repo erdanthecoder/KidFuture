@@ -184,3 +184,10 @@ test('history dates are consistent and in order questions are right', () => {
     assert.ok(['Igneous', 'Sedimentary', 'Metamorphic'].includes(r.options[r.answer]));
   }
 });
+
+test('every topic has an "In real life" note', async () => {
+  const { LIFE } = await import('../year9/js/content-life.js');
+  const ids = [MATHS, SCIENCE, ENGLISH, GEOGRAPHY, HISTORY].flatMap((s) => s.units.flatMap((u) => u.lessons.map((l) => l.id)));
+  for (const id of ids) assert.ok(LIFE[id]?.length > 30, `real-life note for ${id}`);
+  for (const id of Object.keys(LIFE)) assert.ok(ids.includes(id), `unknown lesson ${id}`);
+});

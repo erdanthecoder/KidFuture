@@ -1,7 +1,7 @@
 // Offline support: network first (so updates arrive straight away), cache as a fallback.
-const CACHE = 'y9-v3';
+const CACHE = 'y9-v4';
 const SHELL = ['./', 'index.html', 'styles.css', 'icon.svg', 'manifest.webmanifest', 'js/app.js', 'js/engine.js', 'js/fx.js', 'js/auth.js',
-  'js/sims.js', 'js/content-cards.js', 'js/scheduler.js', 'js/content-maths.js', 'js/content-science.js', 'js/content-english.js', 'js/content-geography.js', 'js/content-history.js'];
+  'js/sims.js', 'js/content-cards.js', 'js/scheduler.js', 'js/content-maths.js', 'js/content-science.js', 'js/content-english.js', 'js/content-geography.js', 'js/content-history.js', 'js/content-life.js'];
 
 self.addEventListener('install', (e) => e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', (e) => e.waitUntil(caches.keys()

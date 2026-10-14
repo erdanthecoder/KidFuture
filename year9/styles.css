@@ -602,3 +602,53 @@ canvas { display: block; border-radius: 12px; background: var(--surface); max-wi
 .profile { text-align: center; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
+
+/* real life, activities, memory */
+.life { margin-top: 14px; padding: 12px 14px; border-radius: 14px; background: var(--good-soft); }
+.life b { display: block; font-size: .78rem; letter-spacing: .06em; text-transform: uppercase; color: var(--good); }
+.life p { margin: 4px 0 0; }
+.life-line { font-size: .9rem; color: var(--muted); margin: 4px 0 6px; }
+.activities { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.act { display: flex; flex-direction: column; gap: 2px; padding: 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); text-decoration: none; color: var(--text); min-width: 0; transition: border-color .15s, transform .15s; }
+.act:hover { border-color: var(--muted); transform: translateY(-2px); }
+.act-i { font-size: 1.4rem; }
+.act small { color: var(--muted); font-size: .8rem; }
+@media (max-width: 560px) { .activities { grid-template-columns: 1fr; } .act { flex-direction: row; align-items: center; gap: 12px; } .act small { margin-left: auto; text-align: right; } }
+.memory { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 16px 14px; margin: 14px 0; }
+.memory h2 { margin-top: .6em; }
+.mem-row { display: grid; grid-template-columns: auto 90px 1fr 44px; align-items: center; gap: 10px; padding: 6px 0; }
+.mem-bar { height: 8px; border-radius: 9px; background: var(--surface-2); overflow: hidden; display: block; }
+.mem-bar i { display: block; height: 100%; width: var(--w); background: var(--good); border-radius: 9px; animation: grow .9s ease-out both; }
+.mem-bar i.low { background: var(--warn); }
+.mem-pct { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+
+/* explain it */
+.explain { max-width: 640px; margin: 0 auto; }
+.explain textarea { width: 100%; font: 400 1.02rem/1.6 var(--font); padding: 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); resize: vertical; }
+.your-text { background: var(--surface-2); border-radius: 14px; padding: 12px 14px; margin: 10px 0 16px; }
+.your-text small { color: var(--muted); }
+.your-text p { margin: 4px 0 0; }
+.tick-list { list-style: none; padding: 0; margin: 0 0 12px; }
+.tick-list label { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: 14px; margin: 8px 0; background: var(--surface); cursor: pointer; }
+.tick-list input { margin-top: 3px; flex: none; }
+.tick-list label:has(input:checked) { border-color: var(--good); background: var(--good-soft); }
+.score-line { font-size: 1.02rem; }
+
+/* speed round */
+.speed { max-width: 600px; margin: 0 auto; }
+.speed-top { display: flex; justify-content: space-between; align-items: baseline; }
+.speed-score { font-size: 2.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.speed-time { font-size: 1.2rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tbar { height: 6px; border-radius: 9px; background: var(--border); overflow: hidden; margin: 4px 0 6px; }
+.tbar i { display: block; height: 100%; width: 100%; background: var(--ink); border-radius: 9px; transition: width .1s linear; }
+.qcard.flash-good { border-color: var(--good); box-shadow: inset 0 0 0 2px var(--good); }
+.qcard.flash-bad { border-color: var(--bad); box-shadow: inset 0 0 0 2px var(--bad); animation: shake .4s; }
+.speed-answer { margin: 12px 0 0; color: var(--good); }
+.big-score { font-size: 5rem; font-weight: 700; line-height: 1; margin: 10px 0; font-variant-numeric: tabular-nums; animation: popIn .5s cubic-bezier(.2, 1.4, .4, 1) both; }
+
+/* guide */
+.lead-text { font-size: 1.08rem; }
+.guide-block { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 18px 16px; margin: 14px 0; }
+.guide-list { padding-left: 20px; }
+.guide-list li { margin: 10px 0; }
+.guide-list .muted { display: block; font-size: .88rem; }

@@ -4,11 +4,12 @@ import { ENGLISH } from './content-english.js';
 import { GEOGRAPHY } from './content-geography.js';
 import { HISTORY } from './content-history.js';
 import { SIMS } from './sims.js';
-import { checkTyped, shuffle, pick, prettyNum, escapeHtml } from './engine.js';
+import { checkTyped, shuffle, pick, prettyNum, escapeHtml, mcq } from './engine.js';
 import { confetti, floatText, countUp, sound, setSound } from './fx.js';
 import { currentUser, signInWithGoogle, googleAvailable, signOutUser, continueAsGuest } from './auth.js';
 import { CARDS } from './content-cards.js';
-import { schedule, preview, formatInterval, AGAIN, HARD, GOOD, EASY, MIN } from './scheduler.js';
+import { schedule, preview, formatInterval, retrievability, AGAIN, HARD, GOOD, EASY, MIN } from './scheduler.js';
+import { LIFE } from './content-life.js';
 
 // ------------------------------------------------------------------ content index
 export const SUBJECTS = [MATHS, SCIENCE, ENGLISH, GEOGRAPHY, HISTORY];
@@ -21,11 +22,11 @@ const INTERVALS = [0, 1, 2, 4, 7, 14]; // days until the next review, by box
 const DAILY_GOAL = 20; // minutes
 let user = currentUser();
 let P = load();
-P.cards ||= {}; P.newCards ||= {};
+P.cards ||= {}; P.newCards ||= {}; P.explains ||= {}; P.best ||= {};
 
-function blank() { return { xp: 0, days: {}, lessons: {}, sessions: 0, sound: true, lastSubject: null, tests: {}, cards: {}, newCards: {} }; }
+function blank() { return { xp: 0, days: {}, lessons: {}, sessions: 0, sound: true, lastSubject: null, tests: {}, cards: {}, newCards: {}, explains: {}, best: {} }; }
 function storeKey() { return `y9.v1.${user?.uid || 'guest'}`; }
-function load() { try { const d = { ...blank(), ...JSON.parse(localStorage.getItem(storeKey()) || '{}') }; d.cards ||= {}; d.newCards ||= {}; return d; } catch { return blank(); } }
+function load() { try { const d = { ...blank(), ...JSON.parse(localStorage.getItem(storeKey()) || '{}') }; d.cards ||= {}; d.newCards ||= {}; d.explains ||= {}; d.best ||= {}; return d; } catch { return blank(); } }
 function save() { try { localStorage.setItem(storeKey(), JSON.stringify(P)); } catch { /* storage unavailable */ } }
 setSound(P.sound);
 
@@ -161,7 +162,7 @@ function render() {
   scrollTo(0, 0);
   if (!user) return loginView();
   const { name, args } = route();
-  const views = { cards: cardsView, '': homeView, subject: subjectView, lesson: lessonView, practice: practiceView, session: sessionView, test: testView, topics: topicsView, profile: profileView };
+  const views = { guide: guideView, explain: explainView, speed: speedView, cards: cardsView, '': homeView, subject: subjectView, lesson: lessonView, practice: practiceView, session: sessionView, test: testView, topics: topicsView, profile: profileView };
   (views[name] || homeView)(...args);
   $$('nav a', document).forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#/${name}` || (a.getAttribute('href') === '#/' && name === '')));
   const av = document.getElementById('avatar');
@@ -243,6 +244,14 @@ function homeView() {
       <a class="q-item" href="#/profile"><b id="xp">0</b><small>XP · level ${lv}</small></a>
     </section>
     <section class="slide-up" style="--d:3">
+      <h2>Activities</h2>
+      <div class="activities">
+        <a class="act" href="#/speed"><span class="act-i">⚡</span><b>Speed round</b><small>60 seconds${P.best.speed ? ` · best ${P.best.speed}` : ''}</small></a>
+        <a class="act" href="#/explain"><span class="act-i">✍</span><b>Explain it</b><small>Teach a topic in your own words</small></a>
+        <a class="act" href="#/guide"><span class="act-i">🏆</span><b>Get an A+</b><small>Methods that work</small></a>
+      </div>
+    </section>
+    <section class="slide-up" style="--d:4">
       <div class="section-head"><h2>Subjects</h2><a href="#/topics" class="link">All topics</a></div>
       <div class="subject-list">${SUBJECTS.map((sub) => {
         const ids = sub.units.flatMap((u) => u.lessons.map((l) => l.id));
@@ -275,7 +284,7 @@ function subjectView(id) {
           <li class="${P.lessons[l.id]?.learned ? 'learned' : ''}">
             <div class="l-main"><b>${escapeHtml(l.title)}</b>${starHtml(l.id)}${isDue(l.id) ? '<span class="chip due">review due</span>' : ''}</div>
             <div class="l-actions"><a class="btn small ${P.lessons[l.id]?.learned ? 'ghost' : 'primary'}" href="#/lesson/${l.id}">${P.lessons[l.id]?.learned ? 'Re-learn' : 'Learn'}</a>
-            <a class="btn small" href="#/practice/${l.id}">Practise</a>${CARDS[l.id] ? `<a class="btn small" href="#/cards/${l.id}">🃏 Cards</a>` : ''}</div>
+            <a class="btn small" href="#/practice/${l.id}">Practise</a>${CARDS[l.id] ? `<a class="btn small" href="#/cards/${l.id}">Cards</a>` : ''}<a class="btn small" href="#/explain/${l.id}">Explain</a></div>
           </li>`).join('')}</ul>
       </section>`).join('')}`;
 }
@@ -284,12 +293,13 @@ function topicsView() {
   app.innerHTML = `
     <div class="section-head"><a href="#/" class="back">← Home</a>${window.Y9_PREVIEW ? '' : '<button class="btn small" id="print">🖨 Print</button>'}</div>
     <h1>All topics — revision sheet</h1>
+    <p><a class="btn small" href="#/guide">🏆 How to get an A+</a></p>
     <p class="muted">Every topic in the app, with the key facts. Tap a topic title to learn it.</p>
     ${SUBJECTS.map((s) => `
       <section class="sheet ${s.id}">
         <h2 class="sheet-subject">${s.icon} ${s.name} <small>${escapeHtml(s.sub)}</small></h2>
         ${s.units.map((u) => `<div class="sheet-unit"><h3><span class="pill">${escapeHtml(u.code)}</span> ${escapeHtml(u.title)}</h3>
-          ${u.lessons.map((l) => `<details class="sheet-lesson" open><summary><a href="#/lesson/${l.id}">${escapeHtml(l.title)}</a> ${starHtml(l.id)}</summary><ul>${l.keys.map((k) => `<li>${k}</li>`).join('')}</ul></details>`).join('')}
+          ${u.lessons.map((l) => `<details class="sheet-lesson" open><summary><a href="#/lesson/${l.id}">${escapeHtml(l.title)}</a> ${starHtml(l.id)}</summary><ul>${l.keys.map((k) => `<li>${k}</li>`).join('')}</ul>${LIFE[l.id] ? `<p class="life-line"><b>In real life:</b> ${LIFE[l.id]}</p>` : ''}</details>`).join('')}
         </div>`).join('')}
       </section>`).join('')}`;
   $('#print')?.addEventListener('click', () => print());
@@ -308,7 +318,7 @@ function runLearn(root, lesson, onDone) {
         <div class="dots-bar">${slides.map((_, k) => `<i class="${k < i ? 'done' : k === i ? 'on' : ''}"></i>`).join('')}</div>
         <article class="slide pop-in">
           <h2>${s.title}</h2>
-          ${s.keysSlide ? `<ul class="keys">${lesson.keys.map((k, n) => `<li style="--d:${n}">${k}</li>`).join('')}</ul><p class="muted small">Read each one, then cover the screen and try to say them from memory.</p>` : ''}
+          ${s.keysSlide ? `<ul class="keys">${lesson.keys.map((k, n) => `<li style="--d:${n}">${k}</li>`).join('')}</ul><p class="muted small">Read each one, then cover the screen and try to say them from memory.</p>${LIFE[lesson.id] ? `<div class="life"><b>In real life</b><p>${LIFE[lesson.id]}</p></div>` : ''}` : ''}
           ${s.html || ''}
           ${s.steps ? `<ol class="steps">${s.steps.map((st, n) => `<li data-n="${n}" class="${n === 0 ? 'show' : ''}">${st}</li>`).join('')}</ol>` : ''}
           ${s.sim ? '<div class="sim" id="sim"></div>' : ''}
@@ -729,6 +739,7 @@ function cardsView(lessonId) {
       <div class="stat"><div><b>${seen}/${ALL_CARDS.length}</b><small>seen</small></div></div>
       <div class="stat"><div><b>${strong}</b><small>known well</small></div></div>
     </section>
+    ${memoryHtml()}
     ${q.length ? `<button class="btn primary big wide slide-up" style="--d:2" id="go">▶ Study ${q.length} card${q.length > 1 ? 's' : ''}</button>` : '<p class="done-msg slide-up">All caught up for today! Come back tomorrow, or study a topic below.</p>'}
     ${SUBJECTS.map((s) => `<section class="unit slide-up" style="--d:3"><h2>${s.icon} ${s.name}</h2><ul class="lesson-list">${s.units.flatMap((u) => u.lessons).filter((l) => CARDS[l.id]).map((l) => {
       const cs = ALL_CARDS.filter((c) => c.lessonId === l.id);
@@ -736,6 +747,236 @@ function cardsView(lessonId) {
       return `<li><div class="l-main"><b>${escapeHtml(l.title)}</b><span class="chip">${known}/${cs.length} known</span></div><div class="l-actions"><a class="btn small" href="#/cards/${l.id}">Study</a></div></li>`;
     }).join('')}</ul></section>`).join('')}`;
   $('#go')?.addEventListener('click', () => { document.body.classList.add('focus-mode'); runCards(app, cardQueue(), { title: 'Flashcards' }); });
+}
+
+// ------------------------------------------------------------------ memory strength
+function memoryHtml() {
+  const now = Date.now();
+  const rows = SUBJECTS.map((sub) => {
+    const ids = new Set(sub.units.flatMap((u) => u.lessons.map((l) => l.id)));
+    const seen = ALL_CARDS.filter((c) => ids.has(c.lessonId) && P.cards[c.id]?.stability);
+    if (!seen.length) return '';
+    const avg = seen.reduce((a, c) => { const st = P.cards[c.id]; return a + retrievability((now - st.lastReview) / DAY, st.stability); }, 0) / seen.length;
+    const pct = Math.round(avg * 100);
+    return `<div class="mem-row"><span class="dot ${sub.id}"></span><b>${sub.name}</b><span class="mem-bar"><i class="${pct < 80 ? 'low' : ''}" style="--w:${pct}%"></i></span><span class="mem-pct">${pct}%</span></div>`;
+  }).join('');
+  return rows ? `<section class="memory slide-up" style="--d:1"><h2>Memory strength</h2><p class="muted small">How much of each subject you’d remember right now, based on your flashcard reviews. Reviews push it back up.</p>${rows}</section>` : '';
+}
+
+// ------------------------------------------------------------------ explain it (self-explanation)
+const keyWords = (k) => [...k.matchAll(/<b>(.*?)<\/b>/g)].map((m) => m[1].replace(/<[^>]+>/g, '').toLowerCase()).filter((w) => w.length > 2);
+const plainText = (h) => h.replace(/<[^>]+>/g, '');
+
+function runExplain(root, lesson, { onDone } = {}) {
+  studying = true;
+  const ref = LESSONS.get(lesson.id);
+  root.innerHTML = `
+    <section class="explain pop-in">
+      <p class="eyebrow">Explain it · ${ref.subject.name}</p>
+      <h1>${escapeHtml(lesson.title)}</h1>
+      <p class="muted">Explain this topic in your own words, as if you were teaching a friend. Don’t look at your notes. Short sentences are fine.</p>
+      <textarea id="ex" rows="9" placeholder="Start writing… What is it? How does it work? An example?"></textarea>
+      ${P.explains[lesson.id] ? '<p class="muted small">You’ve explained this before. Try again without looking — it’s good practice.</p>' : ''}
+      <div class="row"><button class="btn primary wide" id="check" disabled>Check my explanation</button></div>
+      ${onDone ? '<button class="btn ghost small" id="skip">Skip this step</button>' : ''}
+    </section>`;
+  const ta = $('#ex', root), btn = $('#check', root);
+  setTimeout(() => ta.focus({ preventScroll: true }), 200);
+  ta.addEventListener('input', () => { btn.disabled = ta.value.trim().length < 15; });
+  $('#skip', root)?.addEventListener('click', () => onDone({ xp: 0, results: [] }));
+  btn.addEventListener('click', () => {
+    const text = ta.value.trim();
+    const low = text.toLowerCase();
+    P.explains[lesson.id] = { text, t: Date.now() };
+    save();
+    root.innerHTML = `
+      <section class="explain pop-in">
+        <p class="eyebrow">Check your explanation</p>
+        <h1>${escapeHtml(lesson.title)}</h1>
+        <div class="your-text"><small>You wrote</small><p>${escapeHtml(text).replace(/\n/g, '<br>')}</p></div>
+        <p>Tick each key point you included. Points that look covered are already ticked — check each one honestly.</p>
+        <ul class="tick-list">${lesson.keys.map((k, i) => {
+          const words = keyWords(k);
+          const hit = words.length && words.some((w) => low.includes(w.split(' ')[0]));
+          return `<li><label><input type="checkbox" data-k="${i}" ${hit ? 'checked' : ''}><span>${k}</span></label></li>`;
+        }).join('')}</ul>
+        <p class="score-line" id="sc"></p>
+        <button class="btn primary wide" id="done">Done</button>
+      </section>`;
+    const boxes = $$('[data-k]', root);
+    const upd = () => { const n = boxes.filter((b) => b.checked).length; $('#sc', root).innerHTML = `You covered <b>${n} of ${boxes.length}</b> key points. ${n === boxes.length ? 'Brilliant — you really understand this!' : 'Read the ones you missed out loud — that’s how they stick.'}`; };
+    boxes.forEach((b) => b.addEventListener('change', upd));
+    upd();
+    $('#done', root).addEventListener('click', () => {
+      const results = boxes.map((b) => ({ correct: b.checked, lessonId: lesson.id, q: { q: plainText(lesson.keys[b.dataset.k]) } }));
+      const xp = results.filter((r) => r.correct).length * 5;
+      P.xp += xp; save();
+      if (lessonState(lesson.id).learned) recordResults(results);
+      if (results.every((r) => r.correct)) confetti(80);
+      sound('finish');
+      if (onDone) onDone({ xp, results });
+      else { toast(`+${xp} XP`); location.hash = `#/subject/${ref.subject.id}`; }
+    });
+  });
+}
+
+function explainView(id) {
+  let lessonId = id;
+  if (!lessonId || !LESSONS.has(lessonId)) {
+    const learned = learnedIds();
+    lessonId = learned.length ? learned.sort((a, b) => (P.lessons[a].box - P.lessons[b].box) || ((P.explains[a]?.t || 0) - (P.explains[b]?.t || 0)))[0] : [...LESSONS.keys()][0];
+  }
+  document.body.classList.add('focus-mode');
+  app.innerHTML = '<div id="stage"></div>';
+  runExplain($('#stage'), LESSONS.get(lessonId).lesson);
+}
+
+// ------------------------------------------------------------------ speed round
+function speedView() {
+  document.body.classList.add('focus-mode');
+  const learned = learnedIds();
+  const pool = (learned.length >= 2 ? learned : [...LESSONS.keys()]).map((id) => LESSONS.get(id).lesson);
+  const nextQ = () => {
+    for (let k = 0; k < 40; k++) {
+      const l = pick(pool);
+      const q = make(pick(l.practice), l.id);
+      if (q.type === 'mcq' || q.type === 'tf' || (q.type === 'num' && !q.tol)) return q;
+    }
+    return make(pick(pool[0].practice), pool[0].id);
+  };
+  app.innerHTML = `<section class="intro pop-in"><p class="eyebrow">Speed round</p><h1>60 seconds</h1>
+    <p class="muted">Answer as many as you can. Questions come from ${learned.length >= 2 ? 'topics you have learned' : 'all subjects'}.${P.best.speed ? ` Your best: <b>${P.best.speed}</b>.` : ''}</p>
+    <button class="btn primary big" id="go">Start</button></section>`;
+  $('#go').addEventListener('click', () => {
+    studying = true;
+    const end = Date.now() + 60000;
+    let score = 0, streakN = 0, q = null;
+    const wrong = [];
+    const tick = setInterval(() => {
+      const left = Math.max(0, end - Date.now());
+      const bar = $('#tbar'); if (bar) bar.style.width = `${(100 * left) / 60000}%`;
+      const t = $('#tleft'); if (t) t.textContent = Math.ceil(left / 1000);
+      if (left <= 0) { clearInterval(tick); finish(); }
+    }, 100);
+    cleanup.push(() => clearInterval(tick));
+    const show = () => {
+      q = nextQ();
+      app.innerHTML = `<div class="speed"><div class="speed-top"><span class="speed-score">${score}</span><span class="speed-time"><span id="tleft">${Math.ceil((end - Date.now()) / 1000)}</span>s</span></div>
+        <div class="tbar"><i id="tbar"></i></div>
+        <article class="qcard pop-in"><div class="qtext">${q.q}</div><div id="ans"></div></article></div>`;
+      const ans = $('#ans');
+      if (q.type === 'num') {
+        ans.innerHTML = '<input class="answer-input" id="inp" inputmode="decimal" autocomplete="off" placeholder="Answer, then Enter"><div class="row"><button class="btn primary" id="ok">OK</button><button class="btn ghost" id="sk">Skip</button></div>';
+        const inp = $('#inp'); inp.focus({ preventScroll: true });
+        const go = () => { const r = checkTyped(q, inp.value); if (r === 'invalid') { inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake'); return; } mark(r !== 'wrong'); };
+        $('#ok').addEventListener('click', go);
+        $('#sk').addEventListener('click', () => mark(false));
+        keyHandler = (e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
+      } else {
+        const opts = q.type === 'tf' ? ['True', 'False'] : q.options;
+        ans.innerHTML = `<div class="options ${q.type}">${opts.map((o, k) => `<button class="opt" data-k="${k}"><kbd>${k + 1}</kbd><span>${o}</span></button>`).join('')}</div>`;
+        const choose = (k) => mark(q.type === 'tf' ? (k === 0) === q.answer : k === q.answer, k);
+        $$('.opt', ans).forEach((b) => b.addEventListener('click', () => choose(Number(b.dataset.k))));
+        keyHandler = (e) => { const n = Number(e.key); if (n >= 1 && n <= opts.length) choose(n - 1); };
+      }
+    };
+    const mark = (ok, k) => {
+      keyHandler = null;
+      if (ok) { score++; streakN++; sound('correct'); } else { streakN = 0; sound('wrong'); wrong.push(q); }
+      const card = $('.qcard');
+      card.classList.add(ok ? 'flash-good' : 'flash-bad');
+      if (!ok) card.insertAdjacentHTML('beforeend', `<p class="speed-answer">Answer: <b>${answerHtml(q)}</b></p>`);
+      if (k != null) $$('.opt').forEach((b, i) => { if ((q.type === 'tf' ? (i === 0) === q.answer : i === q.answer)) b.classList.add('right'); else if (i === k) b.classList.add('wrong'); b.disabled = true; });
+      later(() => { if (Date.now() < end) show(); }, ok ? 350 : 1300);
+    };
+    const finish = () => {
+      keyHandler = null; studying = false;
+      const best = P.best.speed || 0;
+      const isBest = score > best;
+      if (isBest) P.best.speed = score;
+      P.xp += score * 3; save();
+      app.innerHTML = `<section class="results pop-in"><p class="eyebrow">Speed round</p><h1>${isBest ? 'New best score!' : 'Time’s up!'}</h1>
+        <div class="big-score">${score}</div><p class="muted">correct answers${best && !isBest ? ` · your best is ${best}` : ''} · +${score * 3} XP</p>
+        ${wrong.length ? `<h2>Learn from these</h2><ul class="review">${wrong.map((w) => `<li><div class="rq">${w.q}</div><div class="ra"><small>Answer</small> ${answerHtml(w)}</div>${w.why ? `<div class="rw">💡 ${w.why}</div>` : ''}</li>`).join('')}</ul>` : ''}
+        <div class="row center"><a class="btn" href="#/speed" id="again">Play again</a><a class="btn primary" href="#/">Home</a></div></section>`;
+      $('#again').addEventListener('click', (e) => { e.preventDefault(); render(); });
+      if (isBest || score >= 10) { confetti(120); sound('finish'); }
+    };
+    show();
+  });
+}
+
+// ------------------------------------------------------------------ A+ guide
+const COMMAND_WORDS = [
+  ['State / Name', 'Give a short answer — no explanation needed'],
+  ['Describe', 'Say what happens or what something is like'],
+  ['Explain', 'Say WHY or HOW — use “because” and “so”'],
+  ['Compare', 'Give similarities AND differences, using “whereas”'],
+  ['Calculate', 'Work out a number — show your working'],
+  ['Suggest', 'Use what you know in a new situation'],
+  ['Evaluate', 'Give points for and against, then make a judgement'],
+];
+
+function guideView() {
+  app.innerHTML = `
+    <a href="#/" class="back">← Home</a>
+    <h1>How to get an A+</h1>
+    <p class="lead-text">Smart students don’t study for longer. They study in ways that make memories stick. These are the methods with the strongest evidence from research.</p>
+
+    <section class="guide-block"><h2>1 · Five habits that work</h2>
+      <ol class="guide-list">
+        <li><b>Test yourself</b> — close the book and try to answer. Pulling an answer out of your memory makes it much stronger than re-reading. <span class="muted">In the app: quizzes, flashcards, speed round.</span></li>
+        <li><b>Space it out</b> — 20 minutes every day beats 3 hours the night before. Review just before you would forget. <span class="muted">In the app: the daily session and flashcard reviews.</span></li>
+        <li><b>Mix topics</b> — practise different topics together, not one at a time. It trains you to pick the right method, like in a real exam. <span class="muted">In the app: “Mix it up”.</span></li>
+        <li><b>Explain it</b> — teach the topic in your own words, as if to a friend. Gaps in what you know become obvious. <span class="muted">In the app: “Explain it”.</span></li>
+        <li><b>Words + pictures</b> — draw it: a timeline, the rock cycle, a labelled bacterium. Two kinds of memory are better than one.</li>
+      </ol>
+      <p class="warn-box"><b>What doesn’t work well:</b> re-reading notes, highlighting, and copying out neatly. They feel productive, but you remember very little.</p>
+    </section>
+
+    <section class="guide-block"><h2>2 · In the exam</h2>
+      <ul class="guide-list">
+        <li><b>Read the question twice.</b> Underline the command word and the number of marks.</li>
+        <li><b>Marks = points.</b> A 4-mark question needs about 4 separate points.</li>
+        <li><b>About 1 minute per mark.</b> Never leave a question blank — a sensible guess can still score.</li>
+        <li><b>Maths:</b> show every step (method marks!), include units, round as asked, estimate to check.</li>
+        <li><b>Science:</b> use the key words (diffusion, chlorophyll, alloy…) and link cause to effect: “…because…, so…”.</li>
+        <li><b>English:</b> Point, Evidence (a short quote), Explain what it shows and what Golding wants us to think.</li>
+        <li><b>History:</b> use exact dates, names and facts. For “explain why”, give several causes and link them.</li>
+        <li><b>Geography:</b> describe processes in order and name real places (Malham, Cheddar Gorge).</li>
+      </ul>
+    </section>
+
+    <section class="guide-block"><h2>3 · Command words</h2>
+      <div class="mini-wrap"><table class="mini">${COMMAND_WORDS.map(([w, m]) => `<tr><td><b>${w}</b></td><td>${m}</td></tr>`).join('')}</table></div>
+      <button class="btn primary" id="cw">Practise command words</button>
+    </section>
+
+    <section class="guide-block"><h2>4 · Remember it for life</h2>
+      <ul class="guide-list">
+        <li><b>Keep reviewing, a little.</b> Ten minutes of flashcards a few times a week keeps everything. The gaps between reviews grow to months, so it takes less and less time.</li>
+        <li><b>Connect it to real life.</b> Every topic has an “In real life” note. A fact linked to something you know lasts far longer.</li>
+        <li><b>Teach someone at home.</b> Explaining to a parent or sibling is one of the strongest ways to remember.</li>
+        <li><b>Make memory hooks.</b> MAIN for the causes of WW1. Stalac<b>t</b>ites hang from the <b>t</b>op. Invent your own — silly ones work best.</li>
+        <li><b>Sleep 9 hours.</b> Your brain saves the day’s learning while you sleep. All-nighters wipe it.</li>
+        <li><b>Phone in another room.</b> Even a silent phone on the desk steals attention.</li>
+      </ul>
+    </section>
+
+    <section class="guide-block"><h2>5 · Your week</h2>
+      <div class="mini-wrap"><table class="mini">
+        <tr><td><b>Mon–Fri</b></td><td>Today’s session (about 20 min)</td></tr>
+        <tr><td><b>Saturday</b></td><td>Speed round + explain one topic (10 min)</td></tr>
+        <tr><td><b>Sunday</b></td><td>Flashcards only, or rest</td></tr>
+        <tr><td><b>Before a test</b></td><td>Unit test → review every mistake → flashcards for that topic</td></tr>
+      </table></div>
+    </section>`;
+  $('#cw').addEventListener('click', () => {
+    document.body.classList.add('focus-mode');
+    const qs = shuffle(COMMAND_WORDS).map(([w, m]) => mcq(`Which command word means: <b>${m.toLowerCase()}</b>?`, w, shuffle(COMMAND_WORDS.filter((c) => c[0] !== w).map((c) => c[0])).slice(0, 3),
+      { why: `<b>${w}</b>: ${m}.` }));
+    runQuiz(app, { questions: qs, title: 'Command words', onDone: (r) => resultsView(app, { ...r, title: 'Command words' }) });
+  });
 }
 
 // ------------------------------------------------------------------ today's session
@@ -751,6 +992,7 @@ function sessionView() {
     phases.push({ kind: 'learn', label: 'Learn', ref });
     phases.push({ kind: 'quiz', label: 'Practise', questions: () => practiceSet(plan.lesson, 8) });
     if (CARDS[plan.lesson.id]) phases.push({ kind: 'cards', label: 'New cards', cards: () => ALL_CARDS.filter((c) => c.lessonId === plan.lesson.id && !P.cards[c.id]).slice(0, 8) });
+    phases.push({ kind: 'explain', label: 'Explain it', lesson: plan.lesson });
   }
   phases.push({ kind: 'quiz', label: 'Mix it up', questions: () => {
     const pool = learnedIds().filter((id) => id !== plan.lesson?.id);
@@ -785,6 +1027,10 @@ function sessionView() {
         P.lastSubject = p.ref.subject.id; save();
         runPhase(n + 1);
       });
+      return;
+    }
+    if (p.kind === 'explain') {
+      runExplain(stage, p.lesson, { onDone: (r) => { xpTotal += r.xp; all.push(...r.results); runPhase(n + 1); } });
       return;
     }
     if (p.kind === 'cards') {
