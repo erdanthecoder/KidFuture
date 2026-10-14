@@ -6,7 +6,7 @@ import { HISTORY } from './content-history.js';
 import { SIMS } from './sims.js';
 import { checkTyped, shuffle, pick, prettyNum, escapeHtml, mcq } from './engine.js';
 import { confetti, floatText, countUp, sound, setSound } from './fx.js';
-import { currentUser, signInWithGoogle, googleAvailable, signOutUser, continueAsGuest } from './auth.js';
+import { currentUser, signInWithGoogle, signInWithEmail, createAccount, signOutUser, continueAsGuest, loadCloud, saveCloud } from './auth.js';
 import { CARDS } from './content-cards.js';
 import { schedule, preview, formatInterval, retrievability, AGAIN, HARD, GOOD, EASY, MIN } from './scheduler.js';
 import { LIFE } from './content-life.js';
@@ -27,7 +27,24 @@ P.cards ||= {}; P.newCards ||= {}; P.explains ||= {}; P.best ||= {};
 function blank() { return { xp: 0, days: {}, lessons: {}, sessions: 0, sound: true, lastSubject: null, tests: {}, cards: {}, newCards: {}, explains: {}, best: {} }; }
 function storeKey() { return `y9.v1.${user?.uid || 'guest'}`; }
 function load() { try { const d = { ...blank(), ...JSON.parse(localStorage.getItem(storeKey()) || '{}') }; d.cards ||= {}; d.newCards ||= {}; d.explains ||= {}; d.best ||= {}; return d; } catch { return blank(); } }
-function save() { try { localStorage.setItem(storeKey(), JSON.stringify(P)); } catch { /* storage unavailable */ } }
+function save() {
+  P.savedAt = Date.now();
+  try { localStorage.setItem(storeKey(), JSON.stringify(P)); } catch { /* storage unavailable */ }
+  if (user?.account) saveCloud(P);
+}
+// Bring in progress saved to the FlexiHub account (from another device), keeping whichever copy is newer.
+async function syncFromCloud() {
+  if (!user?.account) return false;
+  const cloud = await loadCloud();
+  if (!cloud) { save(); return false; }
+  const newer = (cloud.savedAt || 0) > (P.savedAt || 0) || (!P.savedAt && (cloud.xp || 0) > (P.xp || 0));
+  if (!newer) { save(); return false; }
+  P = { ...blank(), ...cloud };
+  P.cards ||= {}; P.newCards ||= {}; P.explains ||= {}; P.best ||= {};
+  try { localStorage.setItem(storeKey(), JSON.stringify(P)); } catch { /* ignore */ }
+  setSound(P.sound);
+  return true;
+}
 setSound(P.sound);
 
 const dayKey = (t = Date.now()) => { const d = new Date(t); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
@@ -171,36 +188,57 @@ function render() {
 }
 addEventListener('hashchange', render);
 
-// ------------------------------------------------------------------ login
-function loginView() {
+// ------------------------------------------------------------------ login (FlexiHub accounts)
+const GOOGLE_SVG = '<svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+
+async function afterSignIn(u) {
+  user = u;
+  P = load(); setSound(P.sound);
+  await syncFromCloud();
+  toast(`Welcome, ${escapeHtml(user.name.split(' ')[0])}!`);
+  location.hash = '#/'; render();
+}
+
+function loginView(mode = 'in') {
   document.getElementById('topbar').hidden = true;
+  const create = mode === 'up';
   app.innerHTML = `
     <section class="login">
       <div class="login-card pop-in">
         <div class="logo-big">Y9</div>
         <h1>Year 9 Revision</h1>
-        <p class="lead">Maths · Science · English · Geography · History</p>
-        <p class="muted">15–30 minutes a day. Learn it, practise it, remember it.</p>
-        <button class="btn google" id="g"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continue with Google</button>
-        <p class="small muted" id="gnote">Use your school Google Workspace account.</p>
+        <p class="muted">Maths · Science · English · Geography · History</p>
+        <p class="login-sub"><b>${create ? 'Create a FlexiHub account' : 'Sign in with your FlexiHub account'}</b></p>
+        <form id="acct" class="acct">
+          ${create ? '<input name="name" placeholder="Your name" autocomplete="name" maxlength="60" required aria-label="Your name">' : ''}
+          <input name="email" type="email" placeholder="Email" autocomplete="email" required aria-label="Email">
+          <input name="pw" type="password" placeholder="Password" autocomplete="${create ? 'new-password' : 'current-password'}" minlength="6" required aria-label="Password">
+          <button class="btn primary wide" id="go">${create ? 'Create account' : 'Sign in'}</button>
+        </form>
+        <p class="small">${create ? 'Already have a FlexiHub account? <a href="#" id="swap">Sign in</a>' : 'New to FlexiHub? <a href="#" id="swap">Create an account</a>'}</p>
+        <button class="btn google" id="g">${GOOGLE_SVG}Continue with Google</button>
         <div class="or">or</div>
         <form id="guest" class="guest"><input name="n" placeholder="Your first name" maxlength="30" aria-label="Your first name"><button class="btn">Try as a guest</button></form>
+        <p class="small muted">Signed in, your progress is saved to your account and works on every device. As a guest it stays on this device.</p>
       </div>
     </section>`;
-  googleAvailable().then((ok) => {
-    if (!ok) { $('#g').disabled = true; $('#gnote').textContent = 'Google sign-in works on year9topics.web.app. Here, try as a guest.'; }
+  $('#swap').addEventListener('click', (e) => { e.preventDefault(); loginView(create ? 'in' : 'up'); });
+  $('#acct').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = e.target, btn = $('#go');
+    btn.disabled = true; btn.textContent = create ? 'Creating…' : 'Signing in…';
+    try {
+      const u = create ? await createAccount(f.name.value, f.email.value, f.pw.value) : await signInWithEmail(f.email.value, f.pw.value);
+      await afterSignIn(u);
+    } catch (err) {
+      toast(escapeHtml(err.message));
+      btn.disabled = false; btn.textContent = create ? 'Create account' : 'Sign in';
+    }
   });
   $('#g').addEventListener('click', async () => {
     $('#g').disabled = true;
-    try {
-      user = await signInWithGoogle();
-      P = load(); setSound(P.sound);
-      toast(`Welcome, ${escapeHtml(user.name.split(' ')[0])}!`);
-      location.hash = '#/'; render();
-    } catch (e) {
-      if (!/popup-closed|cancelled-popup/i.test(String(e?.code || e?.message))) toast(escapeHtml(e.message || 'Sign-in failed.'));
-      $('#g').disabled = false;
-    }
+    try { await afterSignIn(await signInWithGoogle()); }
+    catch (err) { if (!err.cancelled) toast(escapeHtml(err.message)); $('#g').disabled = false; }
   });
   $('#guest').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -1063,14 +1101,14 @@ function profileView() {
     <a href="#/" class="back">← Home</a>
     <section class="profile pop-in">
       <div class="avatar big">${user.photo ? `<img src="${escapeHtml(user.photo)}" alt="" referrerpolicy="no-referrer">` : escapeHtml(user.name[0] || '?')}</div>
-      <h1>${escapeHtml(user.name)}</h1><p class="muted">${user.google ? escapeHtml(user.email) : 'Guest — progress is saved on this device only'}</p>
+      <h1>${escapeHtml(user.name)}</h1><p class="muted">${user.account ? `${escapeHtml(user.email)} · FlexiHub account · progress saved to your account` : 'Guest — progress is saved on this device only'}</p>
       <div class="res-stats"><div><b>${P.xp}</b><small>XP</small></div><div><b>${level()}</b><small>level</small></div><div><b>${learned}/${total}</b><small>topics</small></div><div><b>${P.sessions}</b><small>sessions</small></div></div>
       <label class="check"><input type="checkbox" id="snd" ${P.sound ? 'checked' : ''}> Sound effects</label>
       <div class="row center"><button class="btn" id="out">Sign out</button><button class="btn danger" id="reset">Reset my progress</button></div>
       <p class="small muted">Progress is saved in this browser, separately for each account.</p>
     </section>`;
   $('#snd').addEventListener('change', (e) => { P.sound = e.target.checked; setSound(P.sound); save(); });
-  $('#out').addEventListener('click', () => { signOutUser(); user = null; location.hash = '#/'; render(); });
+  $('#out').addEventListener('click', async () => { await signOutUser(); user = null; location.hash = '#/'; render(); });
   $('#reset').addEventListener('click', (e) => {
     if (!e.target.dataset.armed) { e.target.dataset.armed = '1'; e.target.textContent = 'Tap again to reset everything'; return; }
     P = blank(); save(); toast('Progress reset.'); render();
@@ -1078,4 +1116,5 @@ function profileView() {
 }
 
 render();
+if (user?.account) syncFromCloud().then((changed) => { if (changed) render(); });
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});

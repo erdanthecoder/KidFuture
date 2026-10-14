@@ -652,3 +652,9 @@ canvas { display: block; border-radius: 12px; background: var(--surface); max-wi
 .guide-list { padding-left: 20px; }
 .guide-list li { margin: 10px 0; }
 .guide-list .muted { display: block; font-size: .88rem; }
+
+/* account sign-in */
+.login-sub { margin: 18px 0 8px; }
+.acct { display: flex; flex-direction: column; gap: 8px; }
+.acct input { font: 400 1rem var(--font); padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.login .btn.google { margin-top: 6px; }
