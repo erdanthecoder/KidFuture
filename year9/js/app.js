@@ -1,6 +1,8 @@
 import { MATHS } from './content-maths.js';
 import { SCIENCE } from './content-science.js';
 import { ENGLISH } from './content-english.js';
+import { GEOGRAPHY } from './content-geography.js';
+import { HISTORY } from './content-history.js';
 import { SIMS } from './sims.js';
 import { checkTyped, shuffle, pick, prettyNum, escapeHtml } from './engine.js';
 import { confetti, floatText, countUp, sound, setSound } from './fx.js';
@@ -9,7 +11,7 @@ import { CARDS } from './content-cards.js';
 import { schedule, preview, formatInterval, AGAIN, HARD, GOOD, EASY, MIN } from './scheduler.js';
 
 // ------------------------------------------------------------------ content index
-export const SUBJECTS = [MATHS, SCIENCE, ENGLISH];
+export const SUBJECTS = [MATHS, SCIENCE, ENGLISH, GEOGRAPHY, HISTORY];
 const LESSONS = new Map();
 for (const s of SUBJECTS) for (const u of s.units) for (const l of u.lessons) LESSONS.set(l.id, { lesson: l, unit: u, subject: s });
 
@@ -165,11 +167,11 @@ function loginView() {
   document.getElementById('topbar').hidden = true;
   app.innerHTML = `
     <section class="login">
-      <div class="floaters" aria-hidden="true">${['x²', 'π', '10⁶', '⚗', '🧫', '🧲', '🐚', 'a²+b²', '🪐', '√', 'Fe', '📖', '∑', '🔥'].map((s, i) => `<span style="--i:${i};--x:${5 + ((i * 37) % 88)}%;--y:${6 + ((i * 53) % 84)}%">${s}</span>`).join('')}</div>
       <div class="login-card pop-in">
         <div class="logo-big">Y9</div>
         <h1>Year 9 Revision</h1>
-        <p class="lead">Maths · Science · English<br><span class="muted">15–30 minutes a day. Learn it, practise it, remember it.</span></p>
+        <p class="lead">Maths · Science · English · Geography · History</p>
+        <p class="muted">15–30 minutes a day. Learn it, practise it, remember it.</p>
         <button class="btn google" id="g"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continue with Google</button>
         <p class="small muted" id="gnote">Use your school Google Workspace account.</p>
         <div class="or">or</div>
@@ -210,46 +212,43 @@ function homeView() {
   const plan = sessionPlan();
   const mins = minutesToday(), s = streak(), lv = level();
   const first = user.name.split(' ')[0];
-  const hour = new Date().getHours();
-  const hello = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const est = Math.min(30, Math.max(15, (plan.warmIds.length ? 4 : 0) + (plan.lesson ? 14 : 0) + 5));
+  const date = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const cardsDue = cardQueue().length;
+  const ref = plan.lesson ? LESSONS.get(plan.lesson.id) : null;
+  const steps = [plan.warmIds.length && 'Warm-up', dueReviewCards().length && 'Cards', ref && 'Learn', ref && 'Practise', ref && CARDS[plan.lesson.id] && 'New cards', 'Mix'].filter(Boolean);
 
   app.innerHTML = `
     <section class="hello slide-up">
-      <div><h1>${hello}, ${escapeHtml(first)} 👋</h1><p class="muted">${plan.due ? `${plan.due} topic${plan.due > 1 ? 's are' : ' is'} due for review today.` : 'Ready for today’s session?'}</p></div>
+      <p class="eyebrow">${date}</p>
+      <h1>Hi, ${escapeHtml(first)}</h1>
     </section>
-    <section class="stat-row slide-up" style="--d:1">
-      <div class="stat goal">${ring(mins, DAILY_GOAL)}<div><b><span id="mins">0</span> / ${DAILY_GOAL} min</b><small>today’s goal</small></div></div>
-      <div class="stat"><span class="flame ${s ? 'lit' : ''}">🔥</span><div><b><span id="streak">0</span> day${s === 1 ? '' : 's'}</b><small>streak</small></div></div>
-      <a class="stat" href="#/cards"><span class="fc-icon">🃏</span><div><b><span id="cdue">0</span> cards</b><small>flashcards due</small></div></a>
-      <div class="stat"><span class="lvl">${lv}</span><div><b><span id="xp">0</span> XP</b><small>level ${lv} · ${250 - (P.xp % 250)} to next</small><div class="xpbar"><i style="--w:${(P.xp % 250) / 2.5}%"></i></div></div></div>
+    <section class="today slide-up" style="--d:1">
+      <div class="today-top"><span class="eyebrow">Today’s session</span><span class="goal-mini">${ring(mins, DAILY_GOAL, 34)}<span><b id="mins">0</b>/${DAILY_GOAL} min</span></span></div>
+      ${ref ? `<p class="today-subject"><span class="dot ${ref.subject.id}"></span>${ref.subject.name} · ${escapeHtml(ref.unit.code)}</p><h2>${escapeHtml(plan.lesson.title)}</h2>`
+        : '<h2>Mixed review</h2><p class="muted">You’ve learned every topic. Keep them fresh.</p>'}
+      <ol class="steps-line">${steps.map((t) => `<li>${t}</li>`).join('')}</ol>
+      <a class="btn primary big wide" href="#/session">Start · about 20 min</a>
     </section>
-    <section class="today-card slide-up" style="--d:2">
-      <div class="today-head"><div><span class="pill">Today’s session · about ${est} min</span><h2>${plan.lesson ? escapeHtml(plan.lesson.title) : 'Mixed review'}</h2>
-        <p class="muted">${plan.lesson ? `${LESSONS.get(plan.lesson.id).subject.name} · ${escapeHtml(LESSONS.get(plan.lesson.id).unit.code)} ${escapeHtml(LESSONS.get(plan.lesson.id).unit.title)}` : 'You’ve learned every topic — keep them fresh!'}</p></div>
-        <div class="orbit-icon" aria-hidden="true">${plan.lesson ? LESSONS.get(plan.lesson.id).subject.icon : '🏆'}</div></div>
-      <ol class="plan">
-        ${plan.warmIds.length ? `<li><b>Warm-up</b> — ${plan.warmIds.length} quick questions from earlier topics <small>~3 min</small></li>` : ''}
-        ${dueReviewCards().length ? `<li><b>Flashcards</b> — ${Math.min(10, dueReviewCards().length)} cards due for review <small>~2 min</small></li>` : ''}
-        ${plan.lesson ? `<li><b>Learn</b> — animated explanation and worked examples <small>~6 min</small></li><li><b>Practise</b> — 8 activities with instant feedback <small>~7 min</small></li><li><b>Flashcards</b> — the new topic’s key facts <small>~2 min</small></li>` : ''}
-        <li><b>Mix it up</b> — questions from different subjects <small>~4 min</small></li>
-      </ol>
-      <a class="btn primary big" href="#/session">▶ Start session</a>
+    <section class="quick slide-up" style="--d:2">
+      <div class="q-item"><b id="streak">0</b><small>day streak</small></div>
+      <a class="q-item" href="#/cards"><b id="cdue">0</b><small>cards to review</small></a>
+      <a class="q-item" href="#/profile"><b id="xp">0</b><small>XP · level ${lv}</small></a>
     </section>
     <section class="slide-up" style="--d:3">
-      <div class="section-head"><h2>Subjects</h2><a href="#/topics" class="btn ghost small">📋 All topics sheet</a></div>
-      <div class="subjects">${SUBJECTS.map((s) => {
-        const ids = s.units.flatMap((u) => u.lessons.map((l) => l.id));
+      <div class="section-head"><h2>Subjects</h2><a href="#/topics" class="link">All topics</a></div>
+      <div class="subject-list">${SUBJECTS.map((sub) => {
+        const ids = sub.units.flatMap((u) => u.lessons.map((l) => l.id));
         const done = ids.filter((id) => P.lessons[id]?.learned).length;
         const dueN = ids.filter(isDue).length;
-        return `<a class="subject-card ${s.id}" href="#/subject/${s.id}"><span class="s-icon">${s.icon}</span><b>${s.name}</b><small>${escapeHtml(s.sub)}</small>
-          <div class="sbar"><i style="--w:${(100 * done) / ids.length}%"></i></div><small>${done}/${ids.length} topics learned${dueN ? ` · <span class="due">${dueN} due</span>` : ''}</small></a>`;
+        return `<a class="subject-row" href="#/subject/${sub.id}"><span class="s-icon ${sub.id}">${sub.icon}</span>
+          <span class="s-text"><b>${sub.name}</b><small>${escapeHtml(sub.sub)}${dueN ? ` · <span class="due">${dueN} to review</span>` : ''}</small></span>
+          <span class="s-prog"><span class="sbar ${sub.id}"><i style="--w:${(100 * done) / ids.length}%"></i></span><small>${done}/${ids.length}</small></span></a>`;
       }).join('')}</div>
     </section>`;
   countUp($('#mins'), mins);
   countUp($('#streak'), s);
   countUp($('#xp'), P.xp);
-  countUp($('#cdue'), cardQueue().length);
+  countUp($('#cdue'), cardsDue);
   requestAnimationFrame(() => $$('.ring-fg').forEach((c) => c.setAttribute('stroke-dashoffset', c.style.getPropertyValue('--off'))));
 }
 

@@ -12,6 +12,8 @@ Animated lessons and activities for the class revision notes, in 15–30 minutes
 - **Science (Year 8, Exploring Science)** — 8D Unicellular organisms · 8G Metals and their uses ·
   8L Earth and space
 - **English** — *Lord of the Flies*: the novel, all 12 chapters, characters, symbols and quotes
+- **Geography** — Rocks (geog.3): rock types, the rock cycle, weathering, limestone landscapes, using rocks and soil
+- **History** — 1901 to today: votes for women, WW1, between the wars, WW2, the Holocaust, Britain after 1945, the Cold War
 
 Each topic has animated explanation slides with interactive simulations (powers-of-10 ladder,
 significant-figure highlighter, prism/cylinder builders, Pythagoras squares, bacterium and virus,
@@ -22,7 +24,7 @@ multiple choice, true/false, typed answers (exact maths checking: `1/8`, `0.125`
 endless practice, and every generated answer is re-calculated by the tests.
 
 - **Today's session** (≈20 min): warm-up review → learn a new topic → practise → mixed questions.
-- **Flashcards**: 255 cards covering every topic, with a 3D flip and FSRS spaced repetition (20 new a day; cards you forget come back the same day).
+- **Flashcards**: 349 cards covering every topic, with a 3D flip and FSRS spaced repetition (20 new a day; cards you forget come back the same day).
 - **Spaced review**: topics come back after 1, 2, 4, 7 and 14 days; mistakes reset them.
 - **Unit tests**, an **all-topics revision sheet** (printable), XP, streaks and a 20-minute daily goal.
 - **Sign in with Google** (school Google Workspace accounts work), via Firebase Authentication like

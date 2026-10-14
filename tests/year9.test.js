@@ -7,6 +7,8 @@ import { MATHS, _test as M } from '../year9/js/content-maths.js';
 import { SCIENCE, _test as S } from '../year9/js/content-science.js';
 import { ENGLISH, CHAPTERS, _test as E } from '../year9/js/content-english.js';
 import { SIMS } from '../year9/js/sims.js';
+import { GEOGRAPHY, _test as G } from '../year9/js/content-geography.js';
+import { HISTORY, EVENTS, _test as H } from '../year9/js/content-history.js';
 
 const RUNS = 1500;
 const strip = (h) => String(h).replace(/<sup>([^<]*)<\/sup>/g, '^$1').replace(/<[^>]+>/g, '').replace(/−/g, '-').replace(/ /g, '');
@@ -34,7 +36,7 @@ test('significant figures examples from the notes', () => {
 });
 
 test('every lesson is complete and every sim exists', () => {
-  for (const subject of [MATHS, SCIENCE, ENGLISH]) {
+  for (const subject of [MATHS, SCIENCE, ENGLISH, GEOGRAPHY, HISTORY]) {
     for (const unit of subject.units) {
       for (const l of unit.lessons) {
         assert.ok(l.keys.length >= 2, `${l.id} keys`);
@@ -158,11 +160,27 @@ test('science and English generators are consistent', () => {
 
 test('every topic has flashcards, and every card has a front and back', async () => {
   const { CARDS } = await import('../year9/js/content-cards.js');
-  const ids = [MATHS, SCIENCE, ENGLISH].flatMap((s) => s.units.flatMap((u) => u.lessons.map((l) => l.id)));
+  const ids = [MATHS, SCIENCE, ENGLISH, GEOGRAPHY, HISTORY].flatMap((s) => s.units.flatMap((u) => u.lessons.map((l) => l.id)));
   for (const id of ids) assert.ok(CARDS[id]?.length >= 3, `flashcards for ${id}`);
   for (const [id, list] of Object.entries(CARDS)) {
     assert.ok(ids.includes(id), `unknown lesson ${id}`);
     for (const [f, b] of list) assert.ok(f.trim() && b.trim(), `${id}: empty card`);
     assert.equal(new Set(list.map((c) => c[0])).size, list.length, `${id}: duplicate card fronts`);
+  }
+});
+
+test('history dates are consistent and in order questions are right', () => {
+  for (const [y] of EVENTS) assert.ok(y >= 1901 && y <= 2026);
+  const known = { 'The NHS is founded': 1948, 'Humans land on the Moon': 1969, 'The Berlin Wall falls': 1989, 'The Russian Revolution': 1917, 'The Wall Street Crash': 1929 };
+  for (const [ev, y] of Object.entries(known)) assert.equal(EVENTS.find((e) => e[1] === ev)[0], y, ev);
+  for (let i = 0; i < 500; i++) {
+    const q = H.genOrder();
+    const years = q.items.map((it) => EVENTS.find((e) => e[1] === it)[0]);
+    for (let k = 1; k < years.length; k++) assert.ok(years[k] > years[k - 1], q.why);
+    const y = H.genYear();
+    const ev = y.q.replace(/^.*<b>|<\/b>$/g, '');
+    assert.ok(EVENTS.some((e) => e[1] === ev && String(e[0]) === y.answer), y.q);
+    const r = G.genRockType();
+    assert.ok(['Igneous', 'Sedimentary', 'Metamorphic'].includes(r.options[r.answer]));
   }
 });

@@ -203,4 +203,75 @@ export const CARDS = {
     ['“Maybe it’s only us.”', 'Simon, Chapter 5'], ['“Which is better — to have rules and agree, or to hunt and kill?”', 'Piggy, Chapter 11'],
     ['“Kill the pig. Cut her throat. Spill her blood.”', 'The hunters’ chant, Chapter 4'], ['“Fancy thinking the Beast was something you could hunt and kill!”', 'The Lord of the Flies (to Simon), Chapter 8'],
   ],
+  // ---------------- GEOGRAPHY: ROCKS
+  g1: [
+    ['The three types of rock', 'Igneous, sedimentary, metamorphic'], ['Igneous rock', 'Magma or lava that has cooled and hardened'],
+    ['Sedimentary rock', 'Layers of sediment compacted and cemented over millions of years'], ['Metamorphic rock', 'Existing rock changed by heat and pressure, without melting'],
+    ['Why does granite have large crystals?', 'The magma cooled slowly underground'], ['Why does basalt have small crystals?', 'The lava cooled quickly on the surface'],
+    ['Which rock type can contain fossils?', 'Sedimentary'], ['Limestone becomes… (heat and pressure)', 'Marble'], ['Shale becomes… (heat and pressure)', 'Slate'],
+    ['Granite: igneous, sedimentary or metamorphic?', 'Igneous'], ['Chalk: igneous, sedimentary or metamorphic?', 'Sedimentary'], ['Slate: igneous, sedimentary or metamorphic?', 'Metamorphic'],
+  ],
+  g2: [
+    ['What is the rock cycle?', 'Rocks slowly changing from one type to another over millions of years'],
+    ['Weathering → erosion → deposition → …?', 'Compaction and cementation → sedimentary rock'], ['What makes metamorphic rock?', 'Heat and pressure'],
+    ['What happens when rock melts?', 'It becomes magma'], ['What happens when magma cools?', 'It becomes igneous rock'], ['Uplift', 'Rocks pushed back up to the surface'],
+    ['Deposition', 'Sediment is dropped and settles in layers'],
+  ],
+  g3: [
+    ['Weathering', 'Rock breaking down where it is'], ['Erosion', 'Rock worn away and carried off'],
+    ['Freeze-thaw', 'Water in a crack freezes, expands (about 9%), widens the crack; repeated, pieces break off'],
+    ['Chemical weathering example', 'Rainwater (a weak acid) dissolving limestone'], ['Biological weathering example', 'Plant roots growing into cracks'],
+    ['Scree', 'Broken rock at the bottom of a slope'],
+  ],
+  g4: [
+    ['Limestone is mainly…', 'Calcium carbonate'], ['Joints', 'Vertical cracks in limestone'], ['Bedding planes', 'Horizontal cracks between layers'],
+    ['Clints', 'Blocks of limestone pavement'], ['Grikes', 'Gaps between the blocks'], ['Stalactite', 'Hangs from the cave ceiling'],
+    ['Stalagmite', 'Grows up from the cave floor'], ['Pillar', 'A stalactite and stalagmite joined'], ['Swallow hole', 'Where a river disappears underground'],
+    ['UK limestone pavement example', 'Malham, Yorkshire Dales'], ['UK limestone gorge example', 'Cheddar Gorge, Somerset'],
+  ],
+  g5: [
+    ['Slate is used for…', 'Roofs (splits into thin waterproof sheets)'], ['Granite is used for…', 'Buildings, kerbs, worktops (very hard)'],
+    ['Limestone is used for…', 'Building, cement, farming'], ['Marble is used for…', 'Statues and decoration'], ['Clay is used for…', 'Bricks and pottery'],
+    ['Quarrying: advantages', 'Jobs, building materials, money for the area'], ['Quarrying: disadvantages', 'Noise, dust, lorries, scars on the landscape, habitats lost'],
+    ['What is soil made of?', 'Weathered rock, humus, air, water and living things'], ['Humus', 'Rotted plant and animal matter'],
+  ],
+  // ---------------- HISTORY 1901–TODAY
+  h1: [
+    ['Leader of the suffragists (NUWSS)', 'Millicent Fawcett'], ['Leader of the suffragettes (WSPU)', 'Emmeline Pankhurst (founded 1903)'],
+    ['Suffragette motto', '“Deeds, not words”'], ['Cat and Mouse Act (1913)', 'Hunger strikers released when weak, re-arrested when well'],
+    ['Emily Wilding Davison', 'Died after running onto the course at the 1913 Epsom Derby'], ['What happened in 1918?', 'Women over 30 (with property) got the vote'],
+    ['What happened in 1928?', 'Women got the vote at 21, the same as men'],
+  ],
+  h2: [
+    ['MAIN causes of WW1', 'Militarism, Alliances, Imperialism, Nationalism'], ['Triple Entente', 'Britain, France, Russia'], ['Triple Alliance', 'Germany, Austria-Hungary, Italy'],
+    ['The spark of WW1', 'Archduke Franz Ferdinand assassinated in Sarajevo, 28 June 1914'], ['Why did Britain join the war?', 'Germany invaded Belgium (4 August 1914)'],
+    ['No man’s land', 'The land between the two sides’ trenches'], ['First day of the Somme', '1 July 1916 — about 57,000 British casualties'],
+    ['Armistice', '11am, 11 November 1918'], ['Treaty of Versailles (1919)', 'Germany blamed, paid reparations, army cut to 100,000, lost land'],
+  ],
+  h3: [
+    ['Russian Revolution', '1917 — Lenin and the Bolsheviks took power'], ['Wall Street Crash', 'October 1929 — started the Great Depression'],
+    ['When did Hitler become Chancellor?', 'January 1933'], ['Appeasement', 'Giving in to Hitler’s demands to avoid war (Munich, 1938)'],
+    ['Why did Germans support Hitler?', 'Unemployment in the Depression, anger at Versailles, propaganda'],
+  ],
+  h4: [
+    ['WW2 begins', '1 September 1939 Germany invades Poland; 3 September Britain declares war'], ['Dunkirk', '1940 — about 338,000 soldiers rescued from France'],
+    ['Battle of Britain', '1940 — the RAF beat the Luftwaffe'], ['The Blitz', '1940–41 German bombing of British cities'], ['Pearl Harbor', '7 December 1941 — USA joins the war'],
+    ['D-Day', '6 June 1944 — Allied landings in Normandy'], ['VE Day', '8 May 1945'], ['VJ Day', '15 August 1945'],
+    ['Evacuation', 'Children moved from cities to the countryside'], ['Rationing', 'Limits on food like bacon, butter and sugar (from 1940)'],
+  ],
+  h5: [
+    ['The Holocaust', 'The Nazi murder of about 6 million Jewish people, and many others'], ['Nuremberg Laws (1935)', 'Took away Jewish people’s citizenship and rights'],
+    ['Kristallnacht (1938)', 'The “Night of Broken Glass” — attacks on Jewish homes, shops and synagogues'], ['Wannsee Conference (1942)', 'Nazi leaders planned the “Final Solution”'],
+    ['Holocaust Memorial Day', '27 January — Auschwitz was liberated in 1945'],
+  ],
+  h6: [
+    ['Who won the 1945 election?', 'Labour, led by Clement Attlee'], ['The five giants', 'Want, Disease, Ignorance, Squalor, Idleness'],
+    ['When did the NHS begin?', '5 July 1948'], ['Minister who set up the NHS', 'Aneurin Bevan'], ['Indian independence', '15 August 1947 — split into India and Pakistan'],
+    ['Empire Windrush', 'Ship that brought people from the Caribbean in 1948'],
+  ],
+  h7: [
+    ['Cold War', 'USA vs USSR tension, about 1947–1991, with no direct war'], ['Berlin Wall', 'Built 1961, fell 9 November 1989'], ['Cuban Missile Crisis', 'October 1962'],
+    ['First Moon landing', '20 July 1969 — Neil Armstrong, Apollo 11'], ['End of the USSR', 'December 1991'], ['Rosa Parks', '1955 — refused to give up her bus seat'],
+    ['“I have a dream”', 'Martin Luther King, 1963'],
+  ],
 };

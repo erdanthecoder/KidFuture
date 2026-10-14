@@ -3,6 +3,7 @@
 
 import { poly } from './content-maths.js';
 import { CHAPTERS } from './content-english.js';
+import { EVENTS } from './content-history.js';
 import { shiftDecimal, prettyNum, roundSF } from './engine.js';
 
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
@@ -732,6 +733,144 @@ function symbols(el) {
   return () => {};
 }
 
+
+// ===================================================================== GEOGRAPHY
+
+function crystals(el) {
+  html(el, `<div class="sim-row"><label>Cooling time</label><input type="range" id="ct" min="1" max="10" value="2"></div><div id="cc"></div><p class="sim-out" id="co"></p>`);
+  const c = canvas($(el, '#cc'), 170);
+  const draw = () => {
+    const t = Number($(el, '#ct').value);
+    const g = c.ctx; g.clearRect(0, 0, c.w, c.h);
+    // fewer, bigger crystals the slower it cools
+    const size = 5 + t * 5, n = Math.round((c.w * c.h) / (size * size * 1.6));
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const cols = [css('--muted'), '#e5d3c4', '#4b4f5c', '#c9b8a6'];
+    for (let i = 0; i < n; i++) {
+      const x = rnd() * c.w, y = rnd() * c.h, r = size * (0.6 + rnd() * 0.6), a = rnd() * Math.PI;
+      g.fillStyle = cols[i % cols.length];
+      g.beginPath();
+      for (let k = 0; k < 6; k++) { const ang = a + (k * Math.PI) / 3; g.lineTo(x + Math.cos(ang) * r, y + Math.sin(ang) * r * 0.8); }
+      g.closePath(); g.fill();
+    }
+    $(el, '#co').innerHTML = t <= 3 ? '<b>Fast cooling</b> (lava on the surface) → <b>small crystals</b>, like <b>basalt</b>.'
+      : t >= 7 ? '<b>Slow cooling</b> (magma deep underground) → <b>large crystals</b>, like <b>granite</b>.'
+      : 'Medium cooling → medium-sized crystals.';
+  };
+  $(el, '#ct').addEventListener('input', draw);
+  draw();
+  return () => {};
+}
+
+function rockcycle(el) {
+  const nodes = { ig: [170, 26, 'Igneous rock'], sedi: [282, 108, 'Sediment'], sed: [236, 212, 'Sedimentary rock'], met: [104, 212, 'Metamorphic rock'], mag: [58, 108, 'Magma'] };
+  const arrows = [
+    ['ig', 'sedi', 'Weathering and erosion', 'Rock at the surface is broken up and carried away as sediment.'],
+    ['sedi', 'sed', 'Deposition, compaction, cementation', 'Sediment settles in layers, is squashed and glued into sedimentary rock.'],
+    ['sed', 'met', 'Heat and pressure', 'Buried deep, sedimentary rock is changed into metamorphic rock.'],
+    ['met', 'mag', 'Melting', 'Very deep, the rock melts into magma.'],
+    ['mag', 'ig', 'Cooling', 'Magma cools and hardens into igneous rock (inside the crust or as lava).'],
+    ['sed', 'sedi', 'Uplift and weathering', 'Uplift brings rock to the surface, where it is weathered again.'],
+    ['met', 'sedi', 'Uplift and weathering', 'Metamorphic rock can be uplifted and weathered too.'],
+  ];
+  const off = (a, b, k) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy); return [-dy / L * k, dx / L * k]; };
+  html(el, `<svg viewBox="0 0 340 236" class="sim-svg carbon"><defs><marker id="ra" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" class="ah"/></marker></defs>
+    ${arrows.map(([f, t], i) => { const A = nodes[f], B = nodes[t], [ox, oy] = off(A, B, 7); return `<line class="flow" data-i="${i}" x1="${A[0] + ox}" y1="${A[1] + oy}" x2="${B[0] + ox}" y2="${B[1] + oy}" marker-end="url(#ra)"/>`; }).join('')}
+    ${Object.values(nodes).map(([x, y, l]) => `<g class="node"><rect x="${x - 54}" y="${y - 14}" width="108" height="28" rx="14"/><text x="${x}" y="${y + 5}" text-anchor="middle">${l}</text></g>`).join('')}
+    </svg><p class="sim-out" id="rc">Tap an arrow.</p>`);
+  el.querySelectorAll('.flow').forEach((l) => l.addEventListener('click', () => {
+    el.querySelectorAll('.flow').forEach((x) => x.classList.toggle('on', x === l));
+    const [, , n, d] = arrows[l.dataset.i];
+    $(el, '#rc').innerHTML = `<b>${n}</b>: ${d}`;
+  }));
+  return () => {};
+}
+
+function freezethaw(el) {
+  const t = timers();
+  const steps = ['Rain water fills a crack in the rock.', 'At night it freezes. Ice takes up about 9% more space, so it pushes the crack wider.', 'By day the ice thaws, and water runs deeper into the crack.', 'After many freezes and thaws, a piece breaks off and falls as scree.'];
+  html(el, `<svg viewBox="0 0 320 180" class="sim-svg ft" id="fs"></svg><div class="sim-row center"><button class="btn small" id="fp">▶ Play</button></div><p class="sim-out" id="fo">${steps[0]}</p>`);
+  const draw = (k) => {
+    const w = [6, 12, 14, 30][k];
+    $(el, '#fs').innerHTML = `<rect x="0" y="0" width="320" height="180" class="${k === 1 ? 'night' : 'day'}"/>
+      <path d="M40 170 L40 40 L${160 - w / 2} 40 L${160 - w / 4} 120 L${160 + w / 4} 120 L${160 + w / 2} 40 L280 40 L280 170 Z" class="rockface"/>
+      <path d="M${160 - w / 2 + 2} 60 L${160 - w / 4 + 1} 118 L${160 + w / 4 - 1} 118 L${160 + w / 2 - 2} 60 Z" class="${k === 1 ? 'ice' : 'water'}"/>
+      ${k === 3 ? '<path d="M200 40 L280 40 L280 80 L220 70 Z" class="rockface fall"/><circle cx="300" cy="166" r="6" class="rockface"/><circle cx="288" cy="170" r="4" class="rockface"/>' : ''}
+      <text x="12" y="22" class="small">${k === 1 ? 'Night: below 0 °C' : 'Day: above 0 °C'}</text>`;
+    $(el, '#fo').textContent = steps[k];
+  };
+  $(el, '#fp').addEventListener('click', () => { t.clear(); [0, 1, 2, 3].forEach((k) => t.add(setTimeout(() => draw(k), k * (reduced() ? 80 : 1500)))); });
+  draw(0);
+  return t.clear;
+}
+
+function cave(el) {
+  html(el, `<div class="sim-row"><label>Time <b id="cy">0</b> years</label><input type="range" id="cv" min="0" max="100" value="30"></div>
+    <svg viewBox="0 0 320 200" class="sim-svg cavesvg" id="cs"></svg><p class="sim-out" id="co"></p>`);
+  const draw = () => {
+    const v = Number($(el, '#cv').value);
+    const years = Math.round(v * 1000);
+    $(el, '#cy').textContent = years.toLocaleString();
+    const tite = 10 + v * 0.62, mite = 6 + v * 0.62; // grow towards each other
+    const joined = tite + mite >= 150;
+    $(el, '#cs').innerHTML = `<rect x="0" y="0" width="320" height="200" class="rockface"/>
+      <path d="M0 30 Q 160 10 320 30 L320 180 Q160 196 0 180 Z" class="cavern"/>
+      <line x1="160" y1="0" x2="160" y2="24" class="joint"/>
+      <path d="M150 26 L170 26 L${160 + 3} ${26 + tite} L${160 - 3} ${26 + tite} Z" class="calcite"/>
+      <path d="M146 182 L174 182 L${160 + 4} ${182 - mite} L${160 - 4} ${182 - mite} Z" class="calcite"/>
+      ${joined ? '' : `<circle cx="160" cy="${30 + tite}" r="3" class="drip"/>`}
+      <text x="176" y="${40 + tite / 2}" class="small">stalactite</text><text x="176" y="${178 - mite / 2}" class="small">stalagmite</text>`;
+    $(el, '#co').innerHTML = joined ? 'They have joined to make a <b>pillar</b>!' : 'Water drips through the joint. Each drop leaves a tiny bit of <b>calcite</b>, so they grow very slowly — often only about 1 cm every hundred years.';
+  };
+  $(el, '#cv').addEventListener('input', draw);
+  draw();
+  return () => {};
+}
+
+// ===================================================================== HISTORY
+
+function votes(el) {
+  const eras = [
+    [1900, 'Before 1918', 'Only some men could vote (it depended on property). No women could vote.', 0, 60],
+    [1918, '1918 Act', 'All men over 21. Women over 30 who met a property qualification.', 40, 100],
+    [1928, '1928 Act', 'Everyone over 21, men and women equally.', 100, 100],
+    [1969, '1969', 'The voting age was lowered to 18 for everyone.', 100, 100],
+  ];
+  html(el, `<div class="chips-row">${eras.map((e, i) => `<button class="chip-btn" data-i="${i}">${e[1]}</button>`).join('')}</div>
+    <div class="vote-bars"><div><small>Women</small><span><i id="vw"></i></span></div><div><small>Men</small><span><i id="vm"></i></span></div></div>
+    <p class="sim-out" id="vo"></p>`);
+  const show = (i) => {
+    el.querySelectorAll('[data-i]').forEach((b) => b.classList.toggle('on', Number(b.dataset.i) === i));
+    const [, , text, w, m] = eras[i];
+    $(el, '#vw').style.width = `${w}%`; $(el, '#vm').style.width = `${m}%`;
+    $(el, '#vo').innerHTML = `${text}<br><span class="muted">Bars show roughly how many adults of each sex could vote.</span>`;
+  };
+  el.querySelectorAll('[data-i]').forEach((b) => b.addEventListener('click', () => show(Number(b.dataset.i))));
+  show(0);
+  return () => {};
+}
+
+function histline(el, slide) {
+  const [lo, hi] = slide?.range || [1901, 2001];
+  const evs = EVENTS.filter((e) => e[0] >= lo && e[0] <= hi);
+  html(el, `<div class="sim-row"><label><b id="hy">${lo}</b></label><input type="range" id="hr" min="${lo}" max="${hi}" value="${lo}"></div>
+    <div class="tl" id="tl">${evs.map((e, i) => `<div class="tl-ev" data-y="${e[0]}" style="--x:${((e[0] - lo) / Math.max(1, hi - lo)) * 100}%;--r:${i % 3}"><i></i></div>`).join('')}<div class="tl-now" id="tn"></div></div>
+    <div class="tl-list" id="tll"></div>`);
+  const draw = () => {
+    const y = Number($(el, '#hr').value);
+    $(el, '#hy').textContent = y;
+    $(el, '#tn').style.left = `${((y - lo) / Math.max(1, hi - lo)) * 100}%`;
+    el.querySelectorAll('.tl-ev').forEach((d) => d.classList.toggle('past', Number(d.dataset.y) <= y));
+    const shown = evs.filter((e) => e[0] <= y).slice(-4).reverse();
+    $(el, '#tll').innerHTML = shown.map((e, i) => `<div class="tl-item ${i === 0 ? 'new' : ''}"><b>${e[0]}</b><span>${e[1]}</span></div>`).join('') || '<p class="muted">Drag the slider forward.</p>';
+  };
+  $(el, '#hr').addEventListener('input', draw);
+  draw();
+  return () => {};
+}
+
 export const SIMS = { powerladder, sfmove, sigfig, prism, circle, cylinder, pythag, expand, grid, sequence,
   bacterium, virus, sizes, diffusion, growth, leaf, pyramid, carbon, reactivity, series, rusting, alloy,
-  daynight, seasons, models, phases, magnet, weight, scale, characters, timeline, symbols };
+  daynight, seasons, models, phases, magnet, weight, scale, characters, timeline, symbols,
+  crystals, rockcycle, freezethaw, cave, votes, histline };
