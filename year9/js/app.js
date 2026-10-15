@@ -179,9 +179,10 @@ function render() {
   scrollTo(0, 0);
   if (!user) return loginView();
   const { name, args } = route();
-  const views = { guide: guideView, explain: explainView, speed: speedView, cards: cardsView, '': homeView, subject: subjectView, lesson: lessonView, practice: practiceView, session: sessionView, test: testView, topics: topicsView, profile: profileView };
+  const views = { topic: topicView, practise: practiseView, guide: guideView, explain: explainView, speed: speedView, cards: cardsView, '': homeView, subject: subjectView, lesson: lessonView, practice: practiceView, session: sessionView, test: testView, topics: topicsView, profile: profileView };
   (views[name] || homeView)(...args);
-  $$('nav a', document).forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#/${name}` || (a.getAttribute('href') === '#/' && name === '')));
+  const tab = ['', 'subject', 'topic', 'lesson'].includes(name) ? '' : ['practise', 'cards', 'speed', 'explain', 'topics', 'guide', 'test', 'session', 'practice'].includes(name) ? 'practise' : name;
+  $$('nav a', document).forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#/${tab}`));
   const av = document.getElementById('avatar');
   av.innerHTML = user.photo ? `<img src="${escapeHtml(user.photo)}" alt="" referrerpolicy="no-referrer">` : escapeHtml(user.name[0] || '?');
   document.getElementById('topbar').hidden = false;
@@ -255,76 +256,127 @@ function ring(value, max, size = 92, cls = '') {
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-fg" style="--c:${c};--off:${c * (1 - f)}" stroke-dasharray="${c}" stroke-dashoffset="${c}"/></svg>`;
 }
 
-function homeView() {
-  const plan = sessionPlan();
-  const mins = minutesToday(), s = streak(), lv = level();
-  const first = user.name.split(' ')[0];
-  const date = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-  const cardsDue = cardQueue().length;
-  const ref = plan.lesson ? LESSONS.get(plan.lesson.id) : null;
-  const steps = [plan.warmIds.length && 'Warm-up', dueReviewCards().length && 'Cards', ref && 'Learn', ref && 'Practise', ref && CARDS[plan.lesson.id] && 'New cards', 'Mix'].filter(Boolean);
+function subjectProgress(sub) {
+  const ids = sub.units.flatMap((u) => u.lessons.map((l) => l.id));
+  return { ids, done: ids.filter((id) => P.lessons[id]?.learned).length, due: ids.filter(isDue).length };
+}
 
+function homeView() {
+  const next = nextLesson();
+  const ref = next && LESSONS.get(next.id);
+  const reviewN = learnedIds().filter(isDue).length + dueReviewCards().length;
+  const s = streak();
+  const first = user.name.split(' ')[0];
   app.innerHTML = `
     <section class="hello slide-up">
-      <p class="eyebrow">${date}</p>
       <h1>Hi, ${escapeHtml(first)}</h1>
+      <p class="muted">${s ? `🔥 ${s}-day streak. Keep it going!` : 'Ready to learn something new?'}</p>
     </section>
-    <section class="today slide-up" style="--d:1">
-      <div class="today-top"><span class="eyebrow">Today’s session</span><span class="goal-mini">${ring(mins, DAILY_GOAL, 34)}<span><b id="mins">0</b>/${DAILY_GOAL} min</span></span></div>
-      ${ref ? `<p class="today-subject"><span class="dot ${ref.subject.id}"></span>${ref.subject.name} · ${escapeHtml(ref.unit.code)}</p><h2>${escapeHtml(plan.lesson.title)}</h2>`
-        : '<h2>Mixed review</h2><p class="muted">You’ve learned every topic. Keep them fresh.</p>'}
-      <ol class="steps-line">${steps.map((t) => `<li>${t}</li>`).join('')}</ol>
-      <a class="btn primary big wide" href="#/session">Start · about 20 min</a>
-    </section>
-    <section class="quick slide-up" style="--d:2">
-      <div class="q-item"><b id="streak">0</b><small>day streak</small></div>
-      <a class="q-item" href="#/cards"><b id="cdue">0</b><small>cards to review</small></a>
-      <a class="q-item" href="#/profile"><b id="xp">0</b><small>XP · level ${lv}</small></a>
-    </section>
+    ${ref ? `
+    <a class="next-card slide-up" style="--d:1" href="#/topic/${next.id}">
+      <span class="eyebrow">Your next lesson</span>
+      <span class="next-subject"><span class="s-icon ${ref.subject.id}">${ref.subject.icon}</span>${ref.subject.name} · ${escapeHtml(ref.unit.code)}</span>
+      <h2>${escapeHtml(next.title)}</h2>
+      <span class="btn primary big wide">Start lesson</span>
+    </a>` : `<div class="next-card slide-up"><span class="eyebrow">All lessons done</span><h2>You’ve learned every topic!</h2><p class="muted">Keep them fresh with your daily review and flashcards.</p></div>`}
+    ${reviewN ? `
+    <a class="review-card slide-up" style="--d:2" href="#/session">
+      <span class="r-icon">↻</span><span><b>Daily review</b><small>${reviewN} thing${reviewN > 1 ? 's' : ''} to refresh so you don’t forget · about 10 min</small></span><span class="go">→</span>
+    </a>` : ''}
     <section class="slide-up" style="--d:3">
-      <h2>Activities</h2>
-      <div class="activities">
-        <a class="act" href="#/speed"><span class="act-i">⚡</span><b>Speed round</b><small>60 seconds${P.best.speed ? ` · best ${P.best.speed}` : ''}</small></a>
-        <a class="act" href="#/explain"><span class="act-i">✍</span><b>Explain it</b><small>Teach a topic in your own words</small></a>
-        <a class="act" href="#/guide"><span class="act-i">🏆</span><b>Get an A+</b><small>Methods that work</small></a>
-      </div>
-    </section>
-    <section class="slide-up" style="--d:4">
-      <div class="section-head"><h2>Subjects</h2><a href="#/topics" class="link">All topics</a></div>
+      <h2>Subjects</h2>
       <div class="subject-list">${SUBJECTS.map((sub) => {
-        const ids = sub.units.flatMap((u) => u.lessons.map((l) => l.id));
-        const done = ids.filter((id) => P.lessons[id]?.learned).length;
-        const dueN = ids.filter(isDue).length;
+        const { ids, done, due } = subjectProgress(sub);
         return `<a class="subject-row" href="#/subject/${sub.id}"><span class="s-icon ${sub.id}">${sub.icon}</span>
-          <span class="s-text"><b>${sub.name}</b><small>${escapeHtml(sub.sub)}${dueN ? ` · <span class="due">${dueN} to review</span>` : ''}</small></span>
+          <span class="s-text"><b>${sub.name}</b><small>${escapeHtml(sub.sub)}${due ? ` · <span class="due">${due} to review</span>` : ''}</small></span>
           <span class="s-prog"><span class="sbar ${sub.id}"><i style="--w:${(100 * done) / ids.length}%"></i></span><small>${done}/${ids.length}</small></span></a>`;
       }).join('')}</div>
     </section>`;
-  countUp($('#mins'), mins);
-  countUp($('#streak'), s);
-  countUp($('#xp'), P.xp);
-  countUp($('#cdue'), cardsDue);
-  requestAnimationFrame(() => $$('.ring-fg').forEach((c) => c.setAttribute('stroke-dashoffset', c.style.getPropertyValue('--off'))));
 }
 
-// ------------------------------------------------------------------ subject & topics
+function topicStatus(id) {
+  const st = P.lessons[id];
+  if (!st?.learned) return { cls: 'todo', icon: '', text: 'Not started' };
+  if (isDue(id)) return { cls: 'due', icon: '↻', text: 'Done · review due' };
+  return { cls: 'done', icon: '✓', text: `Done ${'★'.repeat(stars(id))}` };
+}
+
 function subjectView(id) {
-  const s = SUBJECTS.find((x) => x.id === id);
-  if (!s) { location.hash = '#/'; return; }
+  const sub = SUBJECTS.find((x) => x.id === id);
+  if (!sub) { location.hash = '#/'; return; }
+  const next = sub.units.flatMap((u) => u.lessons).find((l) => !P.lessons[l.id]?.learned);
+  const { ids, done } = subjectProgress(sub);
+  let n = 0;
   app.innerHTML = `
-    <a href="#/" class="back">← Home</a>
-    <h1 class="subject-title ${s.id}"><span>${s.icon}</span>${s.name} <small>${escapeHtml(s.sub)}</small></h1>
-    ${s.units.map((u, ui) => `
-      <section class="unit slide-up" style="--d:${ui}">
-        <div class="unit-head"><div><span class="pill">${escapeHtml(u.code)}</span><h2>${escapeHtml(u.title)}</h2></div>
-          <a class="btn small" href="#/test/${s.id}/${u.n}">📝 Unit test${P.tests[`${s.id}${u.n}`] != null ? ` · best ${P.tests[`${s.id}${u.n}`]}%` : ''}</a></div>
-        <ul class="lesson-list">${u.lessons.map((l) => `
-          <li class="${P.lessons[l.id]?.learned ? 'learned' : ''}">
-            <div class="l-main"><b>${escapeHtml(l.title)}</b>${starHtml(l.id)}${isDue(l.id) ? '<span class="chip due">review due</span>' : ''}</div>
-            <div class="l-actions"><a class="btn small ${P.lessons[l.id]?.learned ? 'ghost' : 'primary'}" href="#/lesson/${l.id}">${P.lessons[l.id]?.learned ? 'Re-learn' : 'Learn'}</a>
-            <a class="btn small" href="#/practice/${l.id}">Practise</a>${CARDS[l.id] ? `<a class="btn small" href="#/cards/${l.id}">Cards</a>` : ''}<a class="btn small" href="#/explain/${l.id}">Explain</a></div>
-          </li>`).join('')}</ul>
+    <a href="#/" class="back">← Learn</a>
+    <h1 class="subject-title ${sub.id}"><span>${sub.icon}</span>${sub.name}</h1>
+    <p class="muted">${escapeHtml(sub.sub)} · ${done} of ${ids.length} lessons done</p>
+    ${sub.units.map((u, ui) => `
+      <section class="path-unit slide-up" style="--d:${ui}">
+        <h2><span class="pill">${escapeHtml(u.code)}</span> ${escapeHtml(u.title)}</h2>
+        <ol class="path">${u.lessons.map((l) => {
+          n++;
+          const st = topicStatus(l.id), isNext = next && l.id === next.id;
+          return `<li><a class="step ${st.cls} ${isNext ? 'next' : ''}" href="#/topic/${l.id}">
+            <span class="step-n">${st.icon || n}</span>
+            <span class="step-t"><b>${escapeHtml(l.title)}</b><small>${isNext ? 'Next up' : st.text}</small></span>
+            ${isNext ? '<span class="chip go-chip">Start</span>' : ''}</a></li>`;
+        }).join('')}</ol>
+        <a class="unit-test" href="#/test/${sub.id}/${u.n}">📝 Test yourself on this unit${P.tests[`${sub.id}${u.n}`] != null ? ` · best ${P.tests[`${sub.id}${u.n}`]}%` : ''}</a>
       </section>`).join('')}`;
+}
+
+function topicView(id) {
+  const ref = LESSONS.get(id);
+  if (!ref) { location.hash = '#/'; return; }
+  const { lesson, unit, subject } = ref;
+  const learned = !!P.lessons[id]?.learned;
+  const nCards = (CARDS[id] || []).length;
+  app.innerHTML = `
+    <a href="#/subject/${subject.id}" class="back">← ${subject.name}</a>
+    <section class="topic-head slide-up">
+      <p class="eyebrow">${subject.name} · ${escapeHtml(unit.code)}</p>
+      <h1>${escapeHtml(lesson.title)}</h1>
+      <p class="muted">${learned ? topicStatus(id).text : 'About 10 minutes · step by step, with a quick question after each idea'}</p>
+    </section>
+    <a class="btn primary big wide slide-up" style="--d:1" href="#/lesson/${id}">${learned ? 'Go through the lesson again' : 'Start lesson'}</a>
+    <section class="slide-up" style="--d:2">
+      <h2>In this lesson</h2>
+      <ol class="outline">${lesson.learn.map((sl) => `<li>${sl.title}</li>`).join('')}<li>Key facts to remember</li></ol>
+    </section>
+    <section class="slide-up" style="--d:3">
+      <h2>${learned ? 'Keep it fresh' : 'After the lesson'}</h2>
+      <div class="activities">
+        <a class="act" href="#/practice/${id}"><span class="act-i">✏️</span><b>Practise</b><small>8 questions with explanations</small></a>
+        ${nCards ? `<a class="act" href="#/cards/${id}"><span class="act-i">🃏</span><b>Flashcards</b><small>${nCards} cards</small></a>` : ''}
+        <a class="act" href="#/explain/${id}"><span class="act-i">✍</span><b>Explain it</b><small>In your own words</small></a>
+      </div>
+    </section>
+    <details class="keyfacts slide-up" style="--d:4"><summary>Key facts (quick revision)</summary>
+      <ul>${lesson.keys.map((k) => `<li>${k}</li>`).join('')}</ul>
+      ${LIFE[id] ? `<div class="life"><b>In real life</b><p>${LIFE[id]}</p></div>` : ''}
+    </details>`;
+}
+
+function practiseView() {
+  const cardsN = cardQueue().length;
+  const reviewN = learnedIds().filter(isDue).length + dueReviewCards().length;
+  app.innerHTML = `
+    <h1>Practise</h1>
+    <p class="muted">Short activities that make what you’ve learned stick.</p>
+    <div class="hub">
+      <a class="hub-item" href="#/session"><span class="act-i">↻</span><span><b>Daily review</b><small>${reviewN ? `${reviewN} things to refresh` : 'Mixed questions from your topics'} · 10–20 min</small></span></a>
+      <a class="hub-item" href="#/cards"><span class="act-i">🃏</span><span><b>Flashcards</b><small>${cardsN ? `${cardsN} ready to study` : 'All caught up today'}</small></span></a>
+      <a class="hub-item" href="#/speed"><span class="act-i">⚡</span><span><b>Speed round</b><small>60 seconds${P.best.speed ? ` · your best: ${P.best.speed}` : ''}</small></span></a>
+      <a class="hub-item" href="#/explain"><span class="act-i">✍</span><span><b>Explain it</b><small>Teach a topic in your own words</small></span></a>
+      <a class="hub-item" href="#/topics"><span class="act-i">📋</span><span><b>Revision sheet</b><small>Every key fact on one page</small></span></a>
+      <a class="hub-item" href="#/guide"><span class="act-i">🏆</span><span><b>How to get an A+</b><small>Study methods that work</small></span></a>
+    </div>
+    <h2>Unit tests</h2>
+    <div class="subject-list">${SUBJECTS.flatMap((sub) => sub.units.map((u) => `
+      <a class="subject-row" href="#/test/${sub.id}/${u.n}"><span class="s-icon ${sub.id}">${sub.icon}</span>
+        <span class="s-text"><b>${escapeHtml(u.title)}</b><small>${sub.name} · ${escapeHtml(u.code)}</small></span>
+        <span class="s-prog"><small>${P.tests[`${sub.id}${u.n}`] != null ? `best ${P.tests[`${sub.id}${u.n}`]}%` : '12 questions'}</small></span></a>`)).join('')}</div>`;
 }
 
 function topicsView() {
@@ -344,9 +396,39 @@ function topicsView() {
 }
 
 // ------------------------------------------------------------------ learn slides
+// Pick one quick question per lesson part, choosing questions whose words match that part
+// (and not later parts), so each check tests what was just explained.
+const wordsOf = (h) => new Set(String(h).replace(/<[^>]+>/g, ' ').toLowerCase().match(/[a-z0-9²³⁻⁰¹⁴⁵⁶⁷⁸⁹]{4,}/g) || []);
+function quickChecks(lesson) {
+  const parts = lesson.learn.map((sl) => wordsOf(`${sl.title} ${sl.html || ''} ${(sl.steps || []).join(' ')}`));
+  const pool = [], seen = new Set();
+  for (const item of lesson.practice) {
+    for (let k = 0; k < (typeof item === 'function' ? 4 : 1); k++) {
+      const q = make(item, lesson.id);
+      if (['mcq', 'tf', 'num', 'text'].includes(q.type) && !seen.has(q.q)) { seen.add(q.q); pool.push(q); }
+    }
+  }
+  const used = new Set();
+  return parts.map((w, i) => {
+    let best = null, bestScore = 0;
+    for (const q of pool) {
+      if (used.has(q)) continue;
+      const qw = wordsOf(`${q.q} ${q.type === 'mcq' ? q.options[q.answer] : ''}`);
+      let here = 0, later = 0;
+      for (const x of qw) { if (w.has(x)) here++; for (let k = i + 1; k < parts.length; k++) if (parts[k].has(x) && !w.has(x)) { later++; break; } }
+      const score = here - 1.5 * later;
+      if (score > bestScore) { bestScore = score; best = q; }
+    }
+    if (best) used.add(best);
+    return best; // null = no good match: skip the check for this part
+  });
+}
+
 function runLearn(root, lesson, onDone) {
   studying = true;
   const slides = [...lesson.learn, { title: 'Key facts to remember', keysSlide: true }];
+  const checks = quickChecks(lesson);
+  const checked = new Set();
   let i = 0, simStop = null;
   const show = () => {
     simStop?.(); simStop = null;
@@ -354,6 +436,7 @@ function runLearn(root, lesson, onDone) {
     root.innerHTML = `
       <div class="learn">
         <div class="dots-bar">${slides.map((_, k) => `<i class="${k < i ? 'done' : k === i ? 'on' : ''}"></i>`).join('')}</div>
+        <p class="step-count">Part ${i + 1} of ${slides.length}</p>
         <article class="slide pop-in">
           <h2>${s.title}</h2>
           ${s.keysSlide ? `<ul class="keys">${lesson.keys.map((k, n) => `<li style="--d:${n}">${k}</li>`).join('')}</ul><p class="muted small">Read each one, then cover the screen and try to say them from memory.</p>${LIFE[lesson.id] ? `<div class="life"><b>In real life</b><p>${LIFE[lesson.id]}</p></div>` : ''}` : ''}
@@ -364,7 +447,7 @@ function runLearn(root, lesson, onDone) {
         <div class="learn-nav">
           <button class="btn ghost" id="prev" ${i === 0 ? 'disabled' : ''}>← Back</button>
           ${s.steps ? '<button class="btn" id="step">Next step ↓</button>' : ''}
-          <button class="btn primary" id="next">${i === slides.length - 1 ? 'Start practising →' : 'Next →'}</button>
+          <button class="btn primary" id="next">${i === slides.length - 1 ? 'Finish lesson ✓' : 'Next →'}</button>
         </div>
       </div>`;
     if (s.sim && SIMS[s.sim]) simStop = SIMS[s.sim]($('#sim', root), s);
@@ -380,6 +463,12 @@ function runLearn(root, lesson, onDone) {
     $('#next', root).addEventListener('click', () => {
       if (stepBtn && !stepBtn.hidden) { nextStep(); return; }
       if (i === slides.length - 1) { simStop?.(); onDone(); return; }
+      if (!s.keysSlide && checks[i] && !checked.has(i)) {
+        // Check understanding before moving on: retrieval right after learning makes it stick.
+        checked.add(i); simStop?.(); simStop = null;
+        runQuiz(root, { questions: [checks[i]], title: 'Quick check', onDone: () => { i++; show(); } });
+        return;
+      }
       i++; show();
     });
     keyHandler = (e) => {
@@ -579,14 +668,24 @@ function lessonView(id) {
   const ref = LESSONS.get(id);
   if (!ref) { location.hash = '#/'; return; }
   document.body.classList.add('focus-mode');
-  app.innerHTML = `<div class="crumb"><a href="#/subject/${ref.subject.id}">← ${ref.subject.name}</a> · ${escapeHtml(ref.unit.code)} · <b>${escapeHtml(ref.lesson.title)}</b></div><div id="stage"></div>`;
+  app.innerHTML = `<div class="crumb"><a href="#/topic/${id}">← ${escapeHtml(ref.lesson.title)}</a></div><div id="stage"></div>`;
   const stage = $('#stage');
   runLearn(stage, ref.lesson, () => {
     const s = lessonState(id);
-    if (!s.learned) { s.learned = true; s.box = 0; P.xp += 20; toast('📘 Topic learned! +20 XP'); }
+    if (!s.learned) { s.learned = true; s.box = 0; s.due = Date.now() + DAY; P.xp += 20; toast('📘 Topic learned! +20 XP'); }
     P.lastSubject = ref.subject.id;
     save();
-    runPractice(stage, ref);
+    stage.innerHTML = `
+      <section class="complete pop-in">
+        <div class="big-check">✓</div>
+        <h1>Lesson complete!</h1>
+        <p class="muted">${escapeHtml(ref.lesson.title)}</p>
+        <p><b>Now lock it in.</b> Practising straight away helps you remember it much longer.</p>
+        <button class="btn primary big wide" id="pr">Practise now · 8 questions</button>
+        <div class="row center"><a class="btn" href="#/topic/${id}">Back to topic</a><a class="btn" href="#/subject/${ref.subject.id}">${ref.subject.name}</a></div>
+      </section>`;
+    confetti(90); sound('finish');
+    $('#pr', stage).addEventListener('click', () => runPractice(stage, ref));
   });
 }
 
@@ -1061,7 +1160,7 @@ function sessionView() {
     if (p.kind === 'learn') {
       runLearn(stage, p.ref.lesson, () => {
         const s = lessonState(p.ref.lesson.id);
-        if (!s.learned) { s.learned = true; s.box = 0; P.xp += 20; xpTotal += 20; }
+        if (!s.learned) { s.learned = true; s.box = 0; s.due = Date.now() + DAY; P.xp += 20; xpTotal += 20; }
         P.lastSubject = p.ref.subject.id; save();
         runPhase(n + 1);
       });
@@ -1098,14 +1197,28 @@ function sessionView() {
 function profileView() {
   const learned = learnedIds().length, total = LESSONS.size;
   app.innerHTML = `
-    <a href="#/" class="back">← Home</a>
-    <section class="profile pop-in">
+    <h1>Progress</h1>
+    <section class="profile-head">
       <div class="avatar big">${user.photo ? `<img src="${escapeHtml(user.photo)}" alt="" referrerpolicy="no-referrer">` : escapeHtml(user.name[0] || '?')}</div>
-      <h1>${escapeHtml(user.name)}</h1><p class="muted">${user.account ? `${escapeHtml(user.email)} · FlexiHub account · progress saved to your account` : 'Guest — progress is saved on this device only'}</p>
-      <div class="res-stats"><div><b>${P.xp}</b><small>XP</small></div><div><b>${level()}</b><small>level</small></div><div><b>${learned}/${total}</b><small>topics</small></div><div><b>${P.sessions}</b><small>sessions</small></div></div>
+      <div><b>${escapeHtml(user.name)}</b><p class="muted small">${user.account ? `${escapeHtml(user.email)} · FlexiHub account · saved to your account` : 'Guest · saved on this device only'}</p></div>
+    </section>
+    <div class="quick">
+      <div class="q-item"><b>${streak()}</b><small>day streak</small></div>
+      <div class="q-item"><b>${learned}/${total}</b><small>lessons done</small></div>
+      <div class="q-item"><b>${P.xp}</b><small>XP · level ${level()}</small></div>
+    </div>
+    <h2>Subjects</h2>
+    <div class="subject-list">${SUBJECTS.map((sub) => {
+      const { ids, done, due } = subjectProgress(sub);
+      return `<a class="subject-row" href="#/subject/${sub.id}"><span class="s-icon ${sub.id}">${sub.icon}</span>
+        <span class="s-text"><b>${sub.name}</b><small>${done} of ${ids.length} done${due ? ` · ${due} to review` : ''}</small></span>
+        <span class="s-prog"><span class="sbar ${sub.id}"><i style="--w:${(100 * done) / ids.length}%"></i></span></span></a>`;
+    }).join('')}</div>
+    ${memoryHtml()}
+    <section class="settings">
+      <a class="btn" href="#/guide">🏆 How to get an A+</a>
       <label class="check"><input type="checkbox" id="snd" ${P.sound ? 'checked' : ''}> Sound effects</label>
       <div class="row center"><button class="btn" id="out">Sign out</button><button class="btn danger" id="reset">Reset my progress</button></div>
-      <p class="small muted">Progress is saved in this browser, separately for each account.</p>
     </section>`;
   $('#snd').addEventListener('change', (e) => { P.sound = e.target.checked; setSound(P.sound); save(); });
   $('#out').addEventListener('click', async () => { await signOutUser(); user = null; location.hash = '#/'; render(); });
